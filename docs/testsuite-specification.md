@@ -39,9 +39,10 @@ common:
       - name: "validate common outputs"
         run: "echo 'Validating {{ .Outputs.XR }}'"
   assertions:
-    - name: "common-resource-count"
-      type: "Count"
-      value: 3
+    xprin:
+      - name: "common-resource-count"
+        type: "Count"
+        value: 3
 
 tests:
 - name: "My Test Case"
@@ -74,18 +75,19 @@ tests:
       - name: "check render count"
         run: "echo 'Rendered {{ .Outputs.RenderCount }} resources'"
   assertions:
-    - name: "resource-count"
-      type: "Count"
-      value: 3
-    - name: "deployment-exists"
-      type: "Exists"
-      resource: "Deployment/my-app"
-    - name: "replicas-value"
-      type: "FieldValue"
-      resource: "Deployment/my-app"
-      field: "spec.replicas"
-      operator: "=="
-      value: 3
+    xprin:
+      - name: "resource-count"
+        type: "Count"
+        value: 3
+      - name: "deployment-exists"
+        type: "Exists"
+        resource: "Deployment/my-app"
+      - name: "replicas-value"
+        type: "FieldValue"
+        resource: "Deployment/my-app"
+        field: "spec.replicas"
+        operator: "=="
+        value: 3
 - name: "Test: Basic Setup with Claim"
   id: "test-case-2"
   inputs:
@@ -117,7 +119,7 @@ tests:
 | `inputs` | ❌ | map | Common inputs for all test cases |
 | `patches` | ❌ | map | Common patches for all test cases |
 | `hooks` | ❌ | map | Common hooks for all test cases |
-| `assertions` | ❌ | list | Common assertions for all test cases |
+| `assertions` | ❌ | map | Common assertions for all test cases (see [Assertions](assertions.md)) |
 
 ### Test Case
 
@@ -128,7 +130,7 @@ tests:
 | `inputs` | ✅ | map | Inputs for the test case |
 | `patches` | ❌ | map | XR patching configuration |
 | `hooks` | ❌ | map | Hooks for the test case |
-| `assertions` | ❌ | list | Assertions to validate rendered resources |
+| `assertions` | ❌ | map | Assertions to validate rendered resources (see [Assertions](assertions.md)) |
 
 ### Inputs
 

@@ -1113,9 +1113,11 @@ func TestTestCase_mergeCommon(t *testing.T) {
 					Composition: "common-composition.yaml",
 					Functions:   "common-functions.yaml",
 				},
-				Assertions: []Assertion{
-					{Name: "common-count", Type: "Count", Value: 3},
-					{Name: "common-exists", Type: "Exists", Resource: "Deployment/my-app"},
+				Assertions: Assertions{
+					Xprin: []Assertion{
+						{Name: "common-count", Type: "Count", Value: 3},
+						{Name: "common-exists", Type: "Exists", Resource: "Deployment/my-app"},
+					},
 				},
 			},
 			expected: TestCase{
@@ -1125,9 +1127,11 @@ func TestTestCase_mergeCommon(t *testing.T) {
 					Composition: "composition.yaml",
 					Functions:   "functions.yaml",
 				},
-				Assertions: []Assertion{
-					{Name: "common-count", Type: "Count", Value: 3},
-					{Name: "common-exists", Type: "Exists", Resource: "Deployment/my-app"},
+				Assertions: Assertions{
+					Xprin: []Assertion{
+						{Name: "common-count", Type: "Count", Value: 3},
+						{Name: "common-exists", Type: "Exists", Resource: "Deployment/my-app"},
+					},
 				},
 			},
 		},
@@ -1140,8 +1144,10 @@ func TestTestCase_mergeCommon(t *testing.T) {
 					Composition: "composition.yaml",
 					Functions:   "functions.yaml",
 				},
-				Assertions: []Assertion{
-					{Name: "test-count", Type: "Count", Value: 5},
+				Assertions: Assertions{
+					Xprin: []Assertion{
+						{Name: "test-count", Type: "Count", Value: 5},
+					},
 				},
 			},
 			common: Common{
@@ -1149,9 +1155,11 @@ func TestTestCase_mergeCommon(t *testing.T) {
 					Composition: "common-composition.yaml",
 					Functions:   "common-functions.yaml",
 				},
-				Assertions: []Assertion{
-					{Name: "common-count", Type: "Count", Value: 3},
-					{Name: "common-exists", Type: "Exists", Resource: "Deployment/my-app"},
+				Assertions: Assertions{
+					Xprin: []Assertion{
+						{Name: "common-count", Type: "Count", Value: 3},
+						{Name: "common-exists", Type: "Exists", Resource: "Deployment/my-app"},
+					},
 				},
 			},
 			expected: TestCase{
@@ -1161,8 +1169,10 @@ func TestTestCase_mergeCommon(t *testing.T) {
 					Composition: "composition.yaml",
 					Functions:   "functions.yaml",
 				},
-				Assertions: []Assertion{
-					{Name: "test-count", Type: "Count", Value: 5},
+				Assertions: Assertions{
+					Xprin: []Assertion{
+						{Name: "test-count", Type: "Count", Value: 5},
+					},
 				},
 			},
 		},
@@ -1175,8 +1185,10 @@ func TestTestCase_mergeCommon(t *testing.T) {
 					Composition: "composition.yaml",
 					Functions:   "functions.yaml",
 				},
-				Assertions: []Assertion{
-					{Name: "test-count", Type: "Count", Value: 5},
+				Assertions: Assertions{
+					Xprin: []Assertion{
+						{Name: "test-count", Type: "Count", Value: 5},
+					},
 				},
 			},
 			common: Common{
@@ -1192,8 +1204,10 @@ func TestTestCase_mergeCommon(t *testing.T) {
 					Composition: "composition.yaml",
 					Functions:   "functions.yaml",
 				},
-				Assertions: []Assertion{
-					{Name: "test-count", Type: "Count", Value: 5},
+				Assertions: Assertions{
+					Xprin: []Assertion{
+						{Name: "test-count", Type: "Count", Value: 5},
+					},
 				},
 			},
 		},
@@ -1806,15 +1820,17 @@ func TestTestCase_hasAssertions(t *testing.T) {
 		{
 			name: "no assertions",
 			testCase: TestCase{
-				Assertions: []Assertion{},
+				Assertions: Assertions{Xprin: []Assertion{}},
 			},
 			expected: false,
 		},
 		{
 			name: "one assertion",
 			testCase: TestCase{
-				Assertions: []Assertion{
-					{Name: "test-assertion", Type: "Count", Value: 3},
+				Assertions: Assertions{
+					Xprin: []Assertion{
+						{Name: "test-assertion", Type: "Count", Value: 3},
+					},
 				},
 			},
 			expected: true,
@@ -1822,9 +1838,11 @@ func TestTestCase_hasAssertions(t *testing.T) {
 		{
 			name: "multiple assertions",
 			testCase: TestCase{
-				Assertions: []Assertion{
-					{Name: "test-count", Type: "Count", Value: 3},
-					{Name: "test-exists", Type: "Exists", Resource: "Deployment/my-app"},
+				Assertions: Assertions{
+					Xprin: []Assertion{
+						{Name: "test-count", Type: "Count", Value: 3},
+						{Name: "test-exists", Type: "Exists", Resource: "Deployment/my-app"},
+					},
 				},
 			},
 			expected: true,

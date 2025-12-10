@@ -15,6 +15,20 @@ Assertions are executed after Crossplane validation (if CRDs are provided) or af
 
 For information about how assertions work internally, see [How It Works](how-it-works.md#assertions-execution).
 
+## Structure
+
+Assertions are organized by execution engine. Currently, `xprin` assertions are supported (in-process assertions). The structure allows for future extensibility to support other assertion engines e.g. `chainsaw`.
+
+```yaml
+assertions:
+  xprin:
+    - name: "my-assertion"
+      type: "Count"
+      value: 3
+```
+
+All assertions must be placed under the `xprin` key within the `assertions` section.
+
 ## Field Reference
 
 | Field | Required | Type | Description |
@@ -42,9 +56,10 @@ Validates the total number of rendered resources.
 **Example:**
 ```yaml
 assertions:
-  - name: "renders-three-resources"
-    type: "Count"
-    value: 3
+  xprin:
+    - name: "renders-three-resources"
+      type: "Count"
+      value: 3
 ```
 
 **Use Case:** Ensure a composition renders exactly the expected number of resources.
@@ -63,12 +78,13 @@ Validates that a specific resource exists in the rendered output.
 **Example:**
 ```yaml
 assertions:
-  - name: "deployment-exists"
-    type: "Exists"
-    resource: "Deployment/my-app"
-  - name: "service-exists"
-    type: "Exists"
-    resource: "Service/my-app"
+  xprin:
+    - name: "deployment-exists"
+      type: "Exists"
+      resource: "Deployment/my-app"
+    - name: "service-exists"
+      type: "Exists"
+      resource: "Service/my-app"
 ```
 
 **Use Case:** Verify that specific resources are created by the composition.
@@ -87,12 +103,13 @@ Validates that a resource does not exist in the rendered output.
 **Example:**
 ```yaml
 assertions:
-  - name: "no-old-deployment"
-    type: "NotExists"
-    resource: "Deployment/old-app"
-  - name: "no-pods"
-    type: "NotExists"
-    resource: "Pod"
+  xprin:
+    - name: "no-old-deployment"
+      type: "NotExists"
+      resource: "Deployment/old-app"
+    - name: "no-pods"
+      type: "NotExists"
+      resource: "Pod"
 ```
 
 **Use Case:** Ensure deprecated resources are not created, or verify that certain resource types are excluded.
@@ -121,36 +138,37 @@ Validates the type of a field in a resource.
 **Example:**
 ```yaml
 assertions:
-  - name: "replicas-is-number"
-    type: "FieldType"
-    resource: "Deployment/my-app"
-    field: "spec.replicas"
-    value: "number"
-  - name: "name-is-string"
-    type: "FieldType"
-    resource: "Deployment/my-app"
-    field: "metadata.name"
-    value: "string"
-  - name: "labels-is-object"
-    type: "FieldType"
-    resource: "Deployment/my-app"
-    field: "metadata.labels"
-    value: "object"
-  - name: "ports-is-array"
-    type: "FieldType"
-    resource: "Service/my-app"
-    field: "spec.ports"
-    value: "array"
-  - name: "enabled-is-boolean"
-    type: "FieldType"
-    resource: "Deployment/my-app"
-    field: "spec.enabled"
-    value: "boolean"
-  - name: "optional-field-is-null"
-    type: "FieldType"
-    resource: "Deployment/my-app"
-    field: "spec.optionalField"
-    value: "null"
+  xprin:
+    - name: "replicas-is-number"
+      type: "FieldType"
+      resource: "Deployment/my-app"
+      field: "spec.replicas"
+      value: "number"
+    - name: "name-is-string"
+      type: "FieldType"
+      resource: "Deployment/my-app"
+      field: "metadata.name"
+      value: "string"
+    - name: "labels-is-object"
+      type: "FieldType"
+      resource: "Deployment/my-app"
+      field: "metadata.labels"
+      value: "object"
+    - name: "ports-is-array"
+      type: "FieldType"
+      resource: "Service/my-app"
+      field: "spec.ports"
+      value: "array"
+    - name: "enabled-is-boolean"
+      type: "FieldType"
+      resource: "Deployment/my-app"
+      field: "spec.enabled"
+      value: "boolean"
+    - name: "optional-field-is-null"
+      type: "FieldType"
+      resource: "Deployment/my-app"
+      field: "spec.optionalField"
+      value: "null"
 ```
 
 **Use Case:** Validate that fields have the correct data types, ensuring type safety in rendered manifests.
@@ -170,14 +188,15 @@ Validates that a field exists at a given path in a resource.
 **Example:**
 ```yaml
 assertions:
-  - name: "has-replicas-field"
-    type: "FieldExists"
-    resource: "Deployment/my-app"
-    field: "spec.replicas"
-  - name: "has-selector"
-    type: "FieldExists"
-    resource: "Service/my-app"
-    field: "spec.selector"
+  xprin:
+    - name: "has-replicas-field"
+      type: "FieldExists"
+      resource: "Deployment/my-app"
+      field: "spec.replicas"
+    - name: "has-selector"
+      type: "FieldExists"
+      resource: "Service/my-app"
+      field: "spec.selector"
 ```
 
 **Use Case:** Ensure required fields are present in rendered resources.
@@ -197,10 +216,11 @@ Validates that a field does not exist at a given path in a resource.
 **Example:**
 ```yaml
 assertions:
-  - name: "no-deprecated-field"
-    type: "FieldNotExists"
-    resource: "Deployment/my-app"
-    field: "spec.deprecated"
+  xprin:
+    - name: "no-deprecated-field"
+      type: "FieldNotExists"
+      resource: "Deployment/my-app"
+      field: "spec.deprecated"
 ```
 
 **Use Case:** Ensure deprecated or unwanted fields are not present in rendered resources.
@@ -226,18 +246,19 @@ Validates the value of a field in a resource using comparison operators.
 **Example:**
 ```yaml
 assertions:
-  - name: "replicas-equals-three"
-    type: "FieldValue"
-    resource: "Deployment/my-app"
-    field: "spec.replicas"
-    operator: "=="
-    value: 3
-  - name: "engine-is-postgresql"
-    type: "FieldValue"
-    resource: "Cluster/my-db"
-    field: "spec.forProvider.engine"
-    operator: "is"
-    value: "postgresql"
+  xprin:
+    - name: "replicas-equals-three"
+      type: "FieldValue"
+      resource: "Deployment/my-app"
+      field: "spec.replicas"
+      operator: "=="
+      value: 3
+    - name: "engine-is-postgresql"
+      type: "FieldValue"
+      resource: "Cluster/my-db"
+      field: "spec.forProvider.engine"
+      operator: "is"
+      value: "postgresql"
 ```
 
 **Use Case:** Validate specific field values match expected values.
@@ -260,37 +281,38 @@ tests:
       crds:
         - /path/to/crds
     assertions:
-      # Count validation
-      - name: "renders-three-resources"
-        type: "Count"
-        value: 3
-      
-      # Resource existence
-      - name: "deployment-exists"
-        type: "Exists"
-        resource: "Deployment/my-app"
-      - name: "service-exists"
-        type: "Exists"
-        resource: "Service/my-app"
-      
-      # Field validation
-      - name: "deployment-replicas"
-        type: "FieldValue"
-        resource: "Deployment/my-app"
-        field: "spec.replicas"
-        operator: "=="
-        value: 3
-      
-      - name: "service-type"
-        type: "FieldType"
-        resource: "Service/my-app"
-        field: "spec.type"
-        value: "string"
-      
-      - name: "has-selector"
-        type: "FieldExists"
-        resource: "Service/my-app"
-        field: "spec.selector"
+      xprin:
+        # Count validation
+        - name: "renders-three-resources"
+          type: "Count"
+          value: 3
+
+        # Resource existence
+        - name: "deployment-exists"
+          type: "Exists"
+          resource: "Deployment/my-app"
+        - name: "service-exists"
+          type: "Exists"
+          resource: "Service/my-app"
+
+        # Field validation
+        - name: "deployment-replicas"
+          type: "FieldValue"
+          resource: "Deployment/my-app"
+          field: "spec.replicas"
+          operator: "=="
+          value: 3
+
+        - name: "service-type"
+          type: "FieldType"
+          resource: "Service/my-app"
+          field: "spec.type"
+          value: "string"
+
+        - name: "has-selector"
+          type: "FieldExists"
+          resource: "Service/my-app"
+          field: "spec.selector"
 ```
 
 ### Comprehensive Example
@@ -305,82 +327,83 @@ tests:
       crds:
         - /path/to/crds
     assertions:
-      # Count assertion
-      - name: "renders-three-resources"
-        type: "Count"
-        value: 3
-      
-      # Resource existence
-      - name: "deployment-exists"
-        type: "Exists"
-        resource: "Deployment/my-app"
-      - name: "service-exists"
-        type: "Exists"
-        resource: "Service/my-app"
-      
-      # Resource non-existence
-      - name: "no-old-deployment"
-        type: "NotExists"
-        resource: "Deployment/old-app"
-      - name: "no-pods"
-        type: "NotExists"
-        resource: "Pod"
-      
-      # Field existence
-      - name: "has-replicas-field"
-        type: "FieldExists"
-        resource: "Deployment/my-app"
-        field: "spec.replicas"
-      - name: "no-deprecated-field"
-        type: "FieldNotExists"
-        resource: "Deployment/my-app"
-        field: "spec.deprecated"
-      
-      # Field type validation (all supported types)
-      - name: "replicas-is-number"
-        type: "FieldType"
-        resource: "Deployment/my-app"
-        field: "spec.replicas"
-        value: "number"
-      - name: "name-is-string"
-        type: "FieldType"
-        resource: "Deployment/my-app"
-        field: "metadata.name"
-        value: "string"
-      - name: "labels-is-object"
-        type: "FieldType"
-        resource: "Deployment/my-app"
-        field: "metadata.labels"
-        value: "object"
-      - name: "ports-is-array"
-        type: "FieldType"
-        resource: "Service/my-app"
-        field: "spec.ports"
-        value: "array"
-      - name: "enabled-is-boolean"
-        type: "FieldType"
-        resource: "Deployment/my-app"
-        field: "spec.enabled"
-        value: "boolean"
-      - name: "optional-field-is-null"
-        type: "FieldType"
-        resource: "Deployment/my-app"
-        field: "spec.optionalField"
-        value: "null"
-      
-      # Field value validation
-      - name: "replicas-equals-three"
-        type: "FieldValue"
-        resource: "Deployment/my-app"
-        field: "spec.replicas"
-        operator: "=="
-        value: 3
-      - name: "engine-is-postgresql"
-        type: "FieldValue"
-        resource: "Cluster/my-db"
-        field: "spec.forProvider.engine"
-        operator: "is"
-        value: "postgresql"
+      xprin:
+        # Count assertion
+        - name: "renders-three-resources"
+          type: "Count"
+          value: 3
+
+        # Resource existence
+        - name: "deployment-exists"
+          type: "Exists"
+          resource: "Deployment/my-app"
+        - name: "service-exists"
+          type: "Exists"
+          resource: "Service/my-app"
+
+        # Resource non-existence
+        - name: "no-old-deployment"
+          type: "NotExists"
+          resource: "Deployment/old-app"
+        - name: "no-pods"
+          type: "NotExists"
+          resource: "Pod"
+
+        # Field existence
+        - name: "has-replicas-field"
+          type: "FieldExists"
+          resource: "Deployment/my-app"
+          field: "spec.replicas"
+        - name: "no-deprecated-field"
+          type: "FieldNotExists"
+          resource: "Deployment/my-app"
+          field: "spec.deprecated"
+
+        # Field type validation (all supported types)
+        - name: "replicas-is-number"
+          type: "FieldType"
+          resource: "Deployment/my-app"
+          field: "spec.replicas"
+          value: "number"
+        - name: "name-is-string"
+          type: "FieldType"
+          resource: "Deployment/my-app"
+          field: "metadata.name"
+          value: "string"
+        - name: "labels-is-object"
+          type: "FieldType"
+          resource: "Deployment/my-app"
+          field: "metadata.labels"
+          value: "object"
+        - name: "ports-is-array"
+          type: "FieldType"
+          resource: "Service/my-app"
+          field: "spec.ports"
+          value: "array"
+        - name: "enabled-is-boolean"
+          type: "FieldType"
+          resource: "Deployment/my-app"
+          field: "spec.enabled"
+          value: "boolean"
+        - name: "optional-field-is-null"
+          type: "FieldType"
+          resource: "Deployment/my-app"
+          field: "spec.optionalField"
+          value: "null"
+
+        # Field value validation
+        - name: "replicas-equals-three"
+          type: "FieldValue"
+          resource: "Deployment/my-app"
+          field: "spec.replicas"
+          operator: "=="
+          value: 3
+        - name: "engine-is-postgresql"
+          type: "FieldValue"
+          resource: "Cluster/my-db"
+          field: "spec.forProvider.engine"
+          operator: "is"
+          value: "postgresql"
 ```
 
 ## Common vs Test-Level Assertions
@@ -397,12 +420,13 @@ Assertions can be defined in both the `common` section and at the test case leve
 ```yaml
 common:
   assertions:
-    - name: "common-count"
-      type: "Count"
-      value: 3
-    - name: "common-exists"
-      type: "Exists"
-      resource: "Deployment/my-app"
+    xprin:
+      - name: "common-count"
+        type: "Count"
+        value: 3
+      - name: "common-exists"
+        type: "Exists"
+        resource: "Deployment/my-app"
 
 tests:
   - name: "Test 1"
@@ -411,7 +435,7 @@ tests:
       xr: xr1.yaml
       composition: comp.yaml
       functions: /path/to/functions
-  
+
   - name: "Test 2"
     # Test case assertions replace common assertions
     inputs:
@@ -419,9 +443,10 @@ tests:
       composition: comp.yaml
       functions: /path/to/functions
     assertions:
-      - name: "test2-count"
-        type: "Count"
-        value: 5
+      xprin:
+        - name: "test2-count"
+          type: "Count"
+          value: 5
 ```
 
 For detailed information about merging logic, see [How It Works](how-it-works.md#common-vs-test-level-configuration).

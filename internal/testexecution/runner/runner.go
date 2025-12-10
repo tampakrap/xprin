@@ -660,13 +660,13 @@ func (r *Runner) runTestCase(testCase api.TestCase, testSuiteResult *engine.Test
 	// Execute assertions if any are defined (collect errors but don't fail immediately)
 	if testCase.HasAssertions() {
 		if r.Debug {
-			utils.DebugPrintf("Executing %d assertions for test case '%s'\n", len(testCase.Assertions), testCase.Name)
+			utils.DebugPrintf("Executing %d assertions for test case '%s'\n", len(testCase.Assertions.Xprin), testCase.Name)
 		}
 
 		assertionExecutor := newAssertionExecutor(r.fs, &result.Outputs, r.Debug)
 
 		// Store assertion results in test case result
-		result.AssertionsAllResults, result.AssertionsFailedResults = assertionExecutor.executeAssertions(testCase.Assertions)
+		result.AssertionsAllResults, result.AssertionsFailedResults = assertionExecutor.executeAssertions(testCase.Assertions.Xprin)
 
 		if len(result.AssertionsFailedResults) > 0 {
 			finalError = append(finalError, result.MarkAssertionsFailed().Error())

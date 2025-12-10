@@ -59,22 +59,27 @@ type Assertion struct {
 	Value    interface{} `yaml:"value"`    // Expected value for the assertion
 }
 
+// Assertions represents assertions grouped by execution engine.
+type Assertions struct {
+	Xprin []Assertion `yaml:"xprin,omitempty"` // xprin assertions (in-process)
+}
+
 // Common represents the common configuration for a testsuite file.
 type Common struct {
-	Inputs     Inputs      `yaml:"inputs"`
-	Patches    Patches     `yaml:"patches,omitempty"`
-	Hooks      Hooks       `yaml:"hooks,omitempty"`
-	Assertions []Assertion `yaml:"assertions,omitempty"`
+	Inputs     Inputs     `yaml:"inputs"`
+	Patches    Patches    `yaml:"patches,omitempty"`
+	Hooks      Hooks      `yaml:"hooks,omitempty"`
+	Assertions Assertions `yaml:"assertions,omitempty"`
 }
 
 // TestCase represents a single test case.
 type TestCase struct {
-	Name       string      `yaml:"name"`                 // Mandatory descriptive name
-	ID         string      `yaml:"id,omitempty"`         // Optional unique identifier
-	Inputs     Inputs      `yaml:"inputs"`               // Inputs of a test case
-	Patches    Patches     `yaml:"patches,omitempty"`    // Optional XR patching configuration
-	Hooks      Hooks       `yaml:"hooks,omitempty"`      // Optional execution hooks configuration
-	Assertions []Assertion `yaml:"assertions,omitempty"` // Optional assertions
+	Name       string     `yaml:"name"`                 // Mandatory descriptive name
+	ID         string     `yaml:"id,omitempty"`         // Optional unique identifier
+	Inputs     Inputs     `yaml:"inputs"`               // Inputs of a test case
+	Patches    Patches    `yaml:"patches,omitempty"`    // Optional XR patching configuration
+	Hooks      Hooks      `yaml:"hooks,omitempty"`      // Optional execution hooks configuration
+	Assertions Assertions `yaml:"assertions,omitempty"` // Optional assertions
 }
 
 // Inputs represents the inputs for a test case or common configuration.
@@ -143,7 +148,7 @@ func (h *Hooks) HasHooks() bool {
 
 // HasAssertions returns true if any assertions are set.
 func (c *Common) HasAssertions() bool {
-	return len(c.Assertions) > 0
+	return len(c.Assertions.Xprin) > 0
 }
 
 // CheckValidTestSuiteFile checks:
@@ -266,7 +271,7 @@ func (tc *TestCase) HasHooks() bool {
 
 // HasAssertions returns true if any assertions are defined.
 func (tc *TestCase) HasAssertions() bool {
-	return len(tc.Assertions) > 0
+	return len(tc.Assertions.Xprin) > 0
 }
 
 // MergeCommon merges common inputs and patches into the test case.
