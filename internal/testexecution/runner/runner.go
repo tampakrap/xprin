@@ -663,7 +663,15 @@ func (r *Runner) runTestCase(testCase api.TestCase, testSuiteResult *engine.Test
 			utils.DebugPrintf("Executing %d assertions for test case '%s'\n", len(testCase.Assertions.Xprin), testCase.Name)
 		}
 
-		assertionExecutor := newAssertionExecutor(r.fs, &result.Outputs, r.Debug)
+		assertionExecutor := newAssertionExecutor(
+			r.fs,
+			&result.Outputs,
+			r.Debug,
+			r.Repositories,
+			testCase.Inputs,
+			testSuiteResult.GetCompletedTests(),
+			r.renderTemplate,
+		)
 
 		// Store assertion results in test case result
 		result.AssertionsAllResults, result.AssertionsFailedResults = assertionExecutor.executeAssertions(testCase.Assertions.Xprin)
