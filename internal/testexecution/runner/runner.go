@@ -671,6 +671,9 @@ func (r *Runner) runTestCase(testCase api.TestCase, testSuiteResult *engine.Test
 		// Store assertion results in test case result
 		result.AssertionsAllResults, result.AssertionsFailedResults = assertionExecutor.executeAssertions(testCase.Assertions.Xprin)
 
+		// Format assertions output once
+		result.ProcessAssertionsOutput()
+
 		if len(result.AssertionsFailedResults) > 0 {
 			finalError = append(finalError, result.MarkAssertionsFailed().Error())
 		}

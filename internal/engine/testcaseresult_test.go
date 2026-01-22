@@ -301,6 +301,11 @@ func TestTestCaseResult_Print(t *testing.T) {
 			NewAssertionResult("resource-exists", StatusPass, "resource S3Bucket/my-bucket found (as expected)"),
 			NewAssertionResult("field-value", StatusFail, "expected value 'test', got 'other'"),
 		}
+		result.AssertionsFailedResults = []AssertionResult{
+			NewAssertionResult("field-value", StatusFail, "expected value 'test', got 'other'"),
+		}
+		// ProcessAssertionsOutput sets FormattedAssertionsOutput and FormattedAssertionsFailedOutput internally
+		result.ProcessAssertionsOutput()
 		result.Complete()
 
 		var buf bytes.Buffer
@@ -318,6 +323,7 @@ func TestTestCaseResult_Print(t *testing.T) {
 		result.AssertionsAllResults = []AssertionResult{
 			NewAssertionResult("count-check", StatusPass, "found 3 resources (as expected)"),
 		}
+		result.ProcessAssertionsOutput()
 		result.Complete()
 
 		var buf bytes.Buffer
@@ -333,6 +339,7 @@ func TestTestCaseResult_Print(t *testing.T) {
 		result.AssertionsAllResults = []AssertionResult{
 			NewAssertionResult("count-check", StatusPass, "found 3 resources (as expected)"),
 		}
+		result.ProcessAssertionsOutput()
 		result.Complete()
 
 		var buf bytes.Buffer

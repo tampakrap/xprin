@@ -49,10 +49,12 @@ type TestCaseResult struct {
 	RenderedResources []*unstructured.Unstructured
 
 	// Formatted outputs (formatted once, displayed many times)
-	FormattedRenderOutput        string
-	FormattedValidateOutput      string
-	FormattedPreTestHooksOutput  string
-	FormattedPostTestHooksOutput string
+	FormattedRenderOutput           string
+	FormattedValidateOutput         string
+	FormattedPreTestHooksOutput     string
+	FormattedPostTestHooksOutput    string
+	FormattedAssertionsOutput       string // All assertions (for verbose display)
+	FormattedAssertionsFailedOutput string // Failed assertions only (for error messages)
 
 	PreTestHooksResults  []HookResult
 	PostTestHooksResults []HookResult
@@ -142,7 +144,7 @@ func (tcr *TestCaseResult) MarkValidateFailed() error {
 // Callers should then call Fail() with this error to mark the test as failed.
 func (tcr *TestCaseResult) MarkAssertionsFailed() error {
 	tcr.hasFailedAssertions = true
-	return fmt.Errorf("%s", tcr.formatAssertionsOutput(tcr.AssertionsFailedResults, true))
+	return fmt.Errorf("%s", tcr.FormattedAssertionsFailedOutput)
 }
 
 // Print prints the test case result to the given writer.
@@ -172,8 +174,8 @@ func (tcr *TestCaseResult) Print(w io.Writer) {
 		fmt.Fprintf(w, "%s\n", tcr.FormattedValidateOutput) //nolint:errcheck // output function, error handling not practical
 	}
 
-	if len(tcr.AssertionsAllResults) > 0 && tcr.Verbose && tcr.ShowAssertions {
-		fmt.Fprintf(w, "%s\n", tcr.formatAssertionsOutput(tcr.AssertionsAllResults, false)) //nolint:errcheck // output function, error handling not practical
+	if tcr.FormattedAssertionsOutput != "" && tcr.Verbose && tcr.ShowAssertions {
+		fmt.Fprintf(w, "%s\n", tcr.FormattedAssertionsOutput) //nolint:errcheck // output function, error handling not practical
 	}
 
 	if tcr.FormattedPostTestHooksOutput != "" && tcr.Verbose && tcr.ShowHooks {
@@ -376,5 +378,17 @@ func (tcr *TestCaseResult) ProcessHooksOutput() {
 
 	if len(tcr.PostTestHooksResults) > 0 {
 		tcr.FormattedPostTestHooksOutput = tcr.formatHooksOutput(tcr.PostTestHooksResults, "post-test")
+	}
+}
+
+// ProcessAssertionsOutput formats the assertion results.
+// It sets FormattedAssertionsOutput (all assertions) and FormattedAssertionsFailedOutput (failed only).
+func (tcr *TestCaseResult) ProcessAssertionsOutput() {
+	if len(tcr.AssertionsAllResults) > 0 {
+		tcr.FormattedAssertionsOutput = tcr.formatAssertionsOutput(tcr.AssertionsAllResults, false)
+	}
+
+	if len(tcr.AssertionsFailedResults) > 0 {
+		tcr.FormattedAssertionsFailedOutput = tcr.formatAssertionsOutput(tcr.AssertionsFailedResults, true)
 	}
 }
