@@ -49,8 +49,10 @@ type TestCaseResult struct {
 	RenderedResources []*unstructured.Unstructured
 
 	// Formatted outputs (formatted once, displayed many times)
-	FormattedRenderOutput   string
-	FormattedValidateOutput string
+	FormattedRenderOutput        string
+	FormattedValidateOutput      string
+	FormattedPreTestHooksOutput  string
+	FormattedPostTestHooksOutput string
 
 	PreTestHooksResults  []HookResult
 	PostTestHooksResults []HookResult
@@ -158,8 +160,8 @@ func (tcr *TestCaseResult) Print(w io.Writer) {
 	// Print status line
 	fmt.Fprintf(w, "--- %s: %s (%.2fs)\n", tcr.Status, tcr.Name, tcr.Duration.Seconds()) //nolint:errcheck // output function, error handling not practical
 
-	if len(tcr.PreTestHooksResults) > 0 && tcr.Verbose && tcr.ShowHooks {
-		fmt.Fprintf(w, "%s\n", tcr.formatHooksOutput(tcr.PreTestHooksResults, "pre-test")) //nolint:errcheck // output function, error handling not practical
+	if tcr.FormattedPreTestHooksOutput != "" && tcr.Verbose && tcr.ShowHooks {
+		fmt.Fprintf(w, "%s\n", tcr.FormattedPreTestHooksOutput) //nolint:errcheck // output function, error handling not practical
 	}
 
 	if tcr.FormattedRenderOutput != "" && !tcr.hasFailedRender && tcr.Verbose && tcr.ShowRender {
@@ -174,8 +176,8 @@ func (tcr *TestCaseResult) Print(w io.Writer) {
 		fmt.Fprintf(w, "%s\n", tcr.formatAssertionsOutput(tcr.AssertionsAllResults, false)) //nolint:errcheck // output function, error handling not practical
 	}
 
-	if len(tcr.PostTestHooksResults) > 0 && tcr.Verbose && tcr.ShowHooks {
-		fmt.Fprintf(w, "%s\n", tcr.formatHooksOutput(tcr.PostTestHooksResults, "post-test")) //nolint:errcheck // output function, error handling not practical
+	if tcr.FormattedPostTestHooksOutput != "" && tcr.Verbose && tcr.ShowHooks {
+		fmt.Fprintf(w, "%s\n", tcr.FormattedPostTestHooksOutput) //nolint:errcheck // output function, error handling not practical
 	}
 
 	// Print error message for failed tests
@@ -363,4 +365,16 @@ func (tcr *TestCaseResult) ProcessRenderOutput(output []byte) error {
 // It sets FormattedValidateOutput.
 func (tcr *TestCaseResult) ProcessValidateOutput(output []byte) {
 	tcr.FormattedValidateOutput = tcr.formatValidateOutput(output)
+}
+
+// ProcessHooksOutput formats the hooks results.
+// It sets FormattedPreTestHooksOutput and/or FormattedPostTestHooksOutput.
+func (tcr *TestCaseResult) ProcessHooksOutput() {
+	if len(tcr.PreTestHooksResults) > 0 {
+		tcr.FormattedPreTestHooksOutput = tcr.formatHooksOutput(tcr.PreTestHooksResults, "pre-test")
+	}
+
+	if len(tcr.PostTestHooksResults) > 0 {
+		tcr.FormattedPostTestHooksOutput = tcr.formatHooksOutput(tcr.PostTestHooksResults, "post-test")
+	}
 }

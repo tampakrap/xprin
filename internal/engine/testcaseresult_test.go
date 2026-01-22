@@ -209,6 +209,7 @@ func TestTestCaseResult_Print(t *testing.T) {
 		result.PreTestHooksResults = []HookResult{
 			NewHookResult("test-hook", "echo 'hello\nworld'", []byte("hello\nworld"), []byte(""), nil),
 		}
+		result.ProcessHooksOutput()
 		result.Complete()
 
 		var buf bytes.Buffer
@@ -226,6 +227,7 @@ func TestTestCaseResult_Print(t *testing.T) {
 		result.PostTestHooksResults = []HookResult{
 			NewHookResult("cleanup-hook", "echo 'goodbye\nuniverse'", []byte("goodbye\nuniverse"), []byte(""), nil),
 		}
+		result.ProcessHooksOutput()
 		result.Complete()
 
 		var buf bytes.Buffer
@@ -246,6 +248,7 @@ func TestTestCaseResult_Print(t *testing.T) {
 		result.PostTestHooksResults = []HookResult{
 			NewHookResult("cleanup-hook", "echo 'goodbye'", []byte("goodbye"), []byte(""), nil),
 		}
+		result.ProcessHooksOutput()
 		result.Complete()
 
 		var buf bytes.Buffer
@@ -266,6 +269,7 @@ func TestTestCaseResult_Print(t *testing.T) {
 		result.PostTestHooksResults = []HookResult{
 			NewHookResult("cleanup-hook", "echo 'goodbye'", []byte("goodbye"), []byte(""), nil),
 		}
+		result.ProcessHooksOutput()
 		result.Complete()
 
 		var buf bytes.Buffer
@@ -403,6 +407,8 @@ func TestTestCaseResult_Print_Integration(t *testing.T) {
 		result.PostTestHooksResults = []HookResult{
 			NewHookResult("cleanup-hook", "echo 'post-test cleanup'", []byte("post-test cleanup"), []byte(""), nil),
 		}
+		// ProcessHooksOutput sets FormattedPreTestHooksOutput and FormattedPostTestHooksOutput internally
+		result.ProcessHooksOutput()
 		result.Complete()
 
 		var buf bytes.Buffer

@@ -489,6 +489,8 @@ func (r *Runner) runTestCase(testCase api.TestCase, testSuiteResult *engine.Test
 		if err != nil {
 			return result.Fail(err)
 		}
+		// Format hooks output once
+		result.ProcessHooksOutput()
 	}
 
 	// Handle XR input - either convert Claim to XR or use provided XR file
@@ -687,6 +689,8 @@ func (r *Runner) runTestCase(testCase api.TestCase, testSuiteResult *engine.Test
 			// Store hook error but continue execution
 			finalError = append(finalError, err.Error())
 		}
+		// Format hooks output once
+		result.ProcessHooksOutput()
 	}
 
 	// Copy outputs to testsuite artifacts directory
