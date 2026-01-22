@@ -69,7 +69,20 @@ func (e *hookExecutor) executeHooks(hooks []api.Hook, hookType string, inputs ap
 
 			finalCommand, err = e.renderTemplate(hook.Run, templateContext, "hook")
 			if err != nil {
-				return nil, fmt.Errorf("failed to render hook template: %w", err)
+				// Create HookResult for template rendering failure (for consistency with command execution failures)
+				templateErr := fmt.Errorf("failed to render hook template: %w", err)
+				hookResult := engine.NewHookResult(hook.Name, hook.Run, nil, nil, templateErr)
+				hookResults = append(hookResults, hookResult)
+
+				// Create error message similar to command execution failures
+				var errorMsg string
+				if hook.Name != "" {
+					errorMsg = fmt.Sprintf("%s hook '%s' failed to render template: %s: %v", hookType, hook.Name, hook.Run, err)
+				} else {
+					errorMsg = fmt.Sprintf("%s hook failed to render template: %s: %v", hookType, hook.Run, err)
+				}
+
+				return hookResults, errors.New(errorMsg)
 			}
 		}
 
