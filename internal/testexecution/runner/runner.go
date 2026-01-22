@@ -572,19 +572,18 @@ func (r *Runner) runTestCase(testCase api.TestCase, testSuiteResult *engine.Test
 		utils.DebugPrintf("Wrote rendered output to: %s\n", result.Outputs.Render)
 	}
 
-	// Parse render output to extract XR path and resource count
-	renderedResources, err := result.ParseRenderOutput(result.RawRenderOutput)
-	if err != nil {
-		return result.Fail(fmt.Errorf("failed to parse render output: %w", err))
+	// Process render output - this sets RenderedResources and FormattedRenderOutput
+	if err := result.ProcessRenderOutput(result.RawRenderOutput); err != nil {
+		return result.Fail(fmt.Errorf("failed to process render output: %w", err))
 	}
 
-	result.Outputs.RenderCount = len(renderedResources)
+	result.Outputs.RenderCount = len(result.RenderedResources)
 
-	if len(renderedResources) > 0 {
+	if len(result.RenderedResources) > 0 {
 		// Create separate XR file with just the first resource
 		result.Outputs.XR = filepath.Join(r.outputsDir, "xr.yaml")
 
-		xrYAML, err := yaml.Marshal(renderedResources[0])
+		xrYAML, err := yaml.Marshal(result.RenderedResources[0])
 		if err != nil {
 			return result.Fail(fmt.Errorf("failed to marshal XR resource: %w", err))
 		}
@@ -595,7 +594,7 @@ func (r *Runner) runTestCase(testCase api.TestCase, testSuiteResult *engine.Test
 	}
 
 	// Process all resources for Rendered map (including XR)
-	for i, resource := range renderedResources {
+	for i, resource := range result.RenderedResources {
 		kind := resource.GetKind()
 		name := resource.GetName()
 

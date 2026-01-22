@@ -89,6 +89,8 @@ func TestTestCaseResult_FailRender(t *testing.T) {
 	t.Run("sets hasFailedRender and returns fail result", func(t *testing.T) {
 		result := NewTestCaseResult("test", "test-id", false, false, false, false, false)
 		result.RawRenderOutput = []byte("render error output")
+		// Format the error output (simulating what runner.go does for error case)
+		result.FormattedRenderOutput = strings.TrimSpace(string(result.RawRenderOutput))
 
 		returned := result.FailRender()
 
@@ -150,6 +152,9 @@ func TestTestCaseResult_Print(t *testing.T) {
 	t.Run("prints render output when verbose and show-render", func(t *testing.T) {
 		result := NewTestCaseResult("test", "test-id", true, true, false, false, false)
 		result.RawRenderOutput = []byte("apiVersion: v1\nkind: Pod\nmetadata:\n  name: test")
+		// ProcessRenderOutput sets RenderedResources and FormattedRenderOutput internally
+		err := result.ProcessRenderOutput(result.RawRenderOutput)
+		require.NoError(t, err)
 		result.Complete()
 
 		var buf bytes.Buffer
@@ -361,6 +366,10 @@ func TestTestCaseResult_Print_Integration(t *testing.T) {
 	t.Run("successful test with render and validate output", func(t *testing.T) {
 		result := NewTestCaseResult("integration-test", "integration-test-id", true, true, true, false, false)
 		result.RawRenderOutput = []byte("apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: test")
+		// ProcessRenderOutput sets RenderedResources and FormattedRenderOutput internally
+		err := result.ProcessRenderOutput(result.RawRenderOutput)
+		require.NoError(t, err)
+
 		result.RawValidateOutput = []byte("[✓] test validated successfully")
 		result.Complete()
 
@@ -380,6 +389,10 @@ func TestTestCaseResult_Print_Integration(t *testing.T) {
 			NewHookResult("setup-hook", "echo 'pre-test setup'", []byte("pre-test setup"), []byte(""), nil),
 		}
 		result.RawRenderOutput = []byte("apiVersion: v1\nkind: Pod\nmetadata:\n  name: testpod")
+		// ProcessRenderOutput sets RenderedResources and FormattedRenderOutput internally
+		err := result.ProcessRenderOutput(result.RawRenderOutput)
+		require.NoError(t, err)
+
 		result.RawValidateOutput = []byte("[✓] testpod validated successfully")
 		result.PostTestHooksResults = []HookResult{
 			NewHookResult("cleanup-hook", "echo 'post-test cleanup'", []byte("post-test cleanup"), []byte(""), nil),
@@ -453,13 +466,20 @@ func TestFormatRenderOutput(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create a TestCaseResult with the necessary flags
 			result := NewTestCaseResult("test", "test-id", true, true, false, false, false)
-			output := result.formatRenderOutput(tc.input)
 
+			// Parse first to set RenderedResources (formatRenderOutput requires it)
+			resources, err := result.parseRenderOutput(tc.input)
 			if tc.expectErr {
-				// For invalid YAML, the method should return an error message
-				assert.Contains(t, output, "Error parsing YAML")
+				// For invalid YAML, parsing should fail
+				require.Error(t, err)
 				return
 			}
+
+			require.NoError(t, err)
+
+			result.RenderedResources = resources
+
+			output := result.formatRenderOutput()
 
 			if tc.wantOutput {
 				assert.True(t, strings.HasPrefix(output, "    Rendered resources:"))
@@ -707,7 +727,7 @@ func TestTestCaseResult_formatHooksOutput(t *testing.T) {
 	})
 }
 
-func TestTestCaseResult_ParseRenderOutput(t *testing.T) {
+func TestTestCaseResult_ProcessRenderOutput(t *testing.T) {
 	t.Run("parses valid YAML with multiple resources", func(t *testing.T) {
 		result := NewTestCaseResult("test", "test-id", false, false, false, false, false)
 
@@ -721,14 +741,14 @@ kind: Service
 metadata:
   name: test-service`
 
-		resources, err := result.ParseRenderOutput([]byte(yamlInput))
+		err := result.ProcessRenderOutput([]byte(yamlInput))
 
 		require.NoError(t, err)
-		assert.Len(t, resources, 2)
-		assert.Equal(t, "Pod", resources[0].GetKind())
-		assert.Equal(t, "test-pod", resources[0].GetName())
-		assert.Equal(t, "Service", resources[1].GetKind())
-		assert.Equal(t, "test-service", resources[1].GetName())
+		assert.Len(t, result.RenderedResources, 2)
+		assert.Equal(t, "Pod", result.RenderedResources[0].GetKind())
+		assert.Equal(t, "test-pod", result.RenderedResources[0].GetName())
+		assert.Equal(t, "Service", result.RenderedResources[1].GetKind())
+		assert.Equal(t, "test-service", result.RenderedResources[1].GetName())
 	})
 
 	t.Run("parses single resource", func(t *testing.T) {
@@ -739,30 +759,30 @@ kind: ConfigMap
 metadata:
   name: test-config`
 
-		resources, err := result.ParseRenderOutput([]byte(yamlInput))
+		err := result.ProcessRenderOutput([]byte(yamlInput))
 
 		require.NoError(t, err)
-		assert.Len(t, resources, 1)
-		assert.Equal(t, "ConfigMap", resources[0].GetKind())
-		assert.Equal(t, "test-config", resources[0].GetName())
+		assert.Len(t, result.RenderedResources, 1)
+		assert.Equal(t, "ConfigMap", result.RenderedResources[0].GetKind())
+		assert.Equal(t, "test-config", result.RenderedResources[0].GetName())
 	})
 
 	t.Run("handles empty input", func(t *testing.T) {
 		result := NewTestCaseResult("test", "test-id", false, false, false, false, false)
 
-		resources, err := result.ParseRenderOutput([]byte(""))
+		err := result.ProcessRenderOutput([]byte(""))
 
 		require.NoError(t, err)
-		assert.Empty(t, resources)
+		assert.Empty(t, result.RenderedResources)
 	})
 
 	t.Run("handles invalid YAML", func(t *testing.T) {
 		result := NewTestCaseResult("test", "test-id", false, false, false, false, false)
 
-		resources, err := result.ParseRenderOutput([]byte("invalid: [yaml: "))
+		err := result.ProcessRenderOutput([]byte("invalid: [yaml: "))
 
 		require.Error(t, err)
-		assert.Nil(t, resources)
+		assert.Nil(t, result.RenderedResources)
 	})
 
 	t.Run("handles YAML with comments and empty documents", func(t *testing.T) {
@@ -781,12 +801,12 @@ kind: Service
 metadata:
   name: test-service`
 
-		resources, err := result.ParseRenderOutput([]byte(yamlInput))
+		err := result.ProcessRenderOutput([]byte(yamlInput))
 
 		require.NoError(t, err)
 		// Empty documents are parsed as empty objects, so we get 3 items: Pod, empty, Service
-		assert.Len(t, resources, 3)
-		assert.Equal(t, "Pod", resources[0].GetKind())
-		assert.Equal(t, "Service", resources[2].GetKind())
+		assert.Len(t, result.RenderedResources, 3)
+		assert.Equal(t, "Pod", result.RenderedResources[0].GetKind())
+		assert.Equal(t, "Service", result.RenderedResources[2].GetKind())
 	})
 }
