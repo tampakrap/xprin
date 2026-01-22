@@ -49,7 +49,8 @@ type TestCaseResult struct {
 	RenderedResources []*unstructured.Unstructured
 
 	// Formatted outputs (formatted once, displayed many times)
-	FormattedRenderOutput string
+	FormattedRenderOutput   string
+	FormattedValidateOutput string
 
 	PreTestHooksResults  []HookResult
 	PostTestHooksResults []HookResult
@@ -130,7 +131,9 @@ func (tcr *TestCaseResult) FailRender() *TestCaseResult {
 // Callers should then call Fail() with this error to mark the test as failed.
 func (tcr *TestCaseResult) MarkValidateFailed() error {
 	tcr.hasFailedValidate = true
-	return fmt.Errorf("%s", tcr.formatValidateOutput(tcr.RawValidateOutput))
+	tcr.FormattedValidateOutput = tcr.formatValidateOutput(tcr.RawValidateOutput)
+
+	return fmt.Errorf("%s", tcr.FormattedValidateOutput)
 }
 
 // MarkAssertionsFailed marks the test as having failed assertions and returns the formatted error.
@@ -163,8 +166,8 @@ func (tcr *TestCaseResult) Print(w io.Writer) {
 		fmt.Fprintf(w, "%s\n", tcr.FormattedRenderOutput) //nolint:errcheck // output function, error handling not practical
 	}
 
-	if tcr.RawValidateOutput != nil && !tcr.hasFailedValidate && tcr.Verbose && tcr.ShowValidate {
-		fmt.Fprintf(w, "%s\n", tcr.formatValidateOutput(tcr.RawValidateOutput)) //nolint:errcheck // output function, error handling not practical
+	if tcr.FormattedValidateOutput != "" && !tcr.hasFailedValidate && tcr.Verbose && tcr.ShowValidate {
+		fmt.Fprintf(w, "%s\n", tcr.FormattedValidateOutput) //nolint:errcheck // output function, error handling not practical
 	}
 
 	if len(tcr.AssertionsAllResults) > 0 && tcr.Verbose && tcr.ShowAssertions {
@@ -354,4 +357,10 @@ func (tcr *TestCaseResult) ProcessRenderOutput(output []byte) error {
 	tcr.FormattedRenderOutput = tcr.formatRenderOutput()
 
 	return nil
+}
+
+// ProcessValidateOutput formats the validation raw output.
+// It sets FormattedValidateOutput.
+func (tcr *TestCaseResult) ProcessValidateOutput(output []byte) {
+	tcr.FormattedValidateOutput = tcr.formatValidateOutput(output)
 }

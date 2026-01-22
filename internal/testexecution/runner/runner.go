@@ -639,6 +639,8 @@ func (r *Runner) runTestCase(testCase api.TestCase, testSuiteResult *engine.Test
 			result.RawValidateOutput = stdout
 		}
 
+		result.ProcessValidateOutput(result.RawValidateOutput)
+
 		// Write validation output to the outputs directory
 		validateOutputFile := filepath.Join(r.outputsDir, "validate.yaml")
 		if err := afero.WriteFile(r.fs, validateOutputFile, result.RawValidateOutput, 0o600); err != nil {
