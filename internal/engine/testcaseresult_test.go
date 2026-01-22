@@ -168,6 +168,8 @@ func TestTestCaseResult_Print(t *testing.T) {
 	t.Run("prints validate output when verbose and show-validate", func(t *testing.T) {
 		result := NewTestCaseResult("test", "test-id", true, false, true, false, false)
 		result.RawValidateOutput = []byte("[✓] test validated successfully")
+		// ProcessValidateOutput sets FormattedValidateOutput internally
+		result.ProcessValidateOutput(result.RawValidateOutput)
 		result.Complete()
 
 		var buf bytes.Buffer
@@ -371,6 +373,8 @@ func TestTestCaseResult_Print_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		result.RawValidateOutput = []byte("[✓] test validated successfully")
+		// ProcessValidateOutput sets FormattedValidateOutput internally
+		result.ProcessValidateOutput(result.RawValidateOutput)
 		result.Complete()
 
 		var buf bytes.Buffer
@@ -394,6 +398,8 @@ func TestTestCaseResult_Print_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		result.RawValidateOutput = []byte("[✓] testpod validated successfully")
+		// ProcessValidateOutput sets FormattedValidateOutput internally
+		result.ProcessValidateOutput(result.RawValidateOutput)
 		result.PostTestHooksResults = []HookResult{
 			NewHookResult("cleanup-hook", "echo 'post-test cleanup'", []byte("post-test cleanup"), []byte(""), nil),
 		}
