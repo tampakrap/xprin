@@ -184,10 +184,19 @@ func (tcr *TestCaseResult) Print(w io.Writer) {
 
 	// Print error message for failed tests
 	if tcr.Status == StatusFail && tcr.Error != nil {
-		// Indent each line of the error message with 4 spaces
 		errorLines := strings.Split(tcr.Error.Error(), "\n")
-		for _, line := range errorLines {
-			fmt.Fprintf(w, "    %s\n", line) //nolint:errcheck // output function, error handling not practical
+		// Validate errors are already formatted by formatValidateOutput() with proper indentation
+		// Other errors (like from CheckMandatoryFields) need normalization
+		if tcr.hasFailedValidate {
+			// Print validate error as-is (already formatted)
+			for _, line := range errorLines {
+				fmt.Fprintf(w, "    %s\n", line) //nolint:errcheck // output function, error handling not practical
+			}
+		} else {
+			// Normalize other errors: remove leading whitespace from all lines so we can add consistent 4-space indentation
+			for _, line := range errorLines {
+				fmt.Fprintf(w, "    %s\n", strings.TrimLeft(line, " \t")) //nolint:errcheck // output function, error handling not practical
+			}
 		}
 	}
 }
