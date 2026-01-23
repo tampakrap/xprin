@@ -17,10 +17,14 @@ limitations under the License.
 package runner
 
 import (
+	"fmt"
+	"strings"
 	"testing"
+	"text/template"
 
 	"github.com/crossplane-contrib/xprin/internal/api"
 	"github.com/crossplane-contrib/xprin/internal/engine"
+	testexecutionUtils "github.com/crossplane-contrib/xprin/internal/testexecution/utils"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"  //nolint:depguard // testify is widely used for testing
 	"github.com/stretchr/testify/require" //nolint:depguard // testify is widely used for testing
@@ -36,13 +40,34 @@ func TestNewAssertionExecutor(t *testing.T) {
 		Rendered: make(map[string]string),
 	}
 
-	executor := newAssertionExecutor(afero.NewMemMapFs(), outputs, false)
+	// Mock renderTemplate function (no-op for this test)
+	renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+		return content, nil
+	}
+
+	executor := newAssertionExecutor(
+		afero.NewMemMapFs(),
+		outputs,
+		false,
+		map[string]string{},
+		api.Inputs{},
+		map[string]*engine.TestCaseResult{},
+		renderTemplate,
+	)
 
 	assert.NotNil(t, executor)
 	assert.Equal(t, outputs, executor.outputs)
 	assert.False(t, executor.debug)
 
-	executorWithDebug := newAssertionExecutor(afero.NewMemMapFs(), outputs, true)
+	executorWithDebug := newAssertionExecutor(
+		afero.NewMemMapFs(),
+		outputs,
+		true,
+		map[string]string{},
+		api.Inputs{},
+		map[string]*engine.TestCaseResult{},
+		renderTemplate,
+	)
 	assert.True(t, executorWithDebug.debug)
 }
 
@@ -65,7 +90,20 @@ metadata:
 `), 0o644)
 		require.NoError(t, err)
 
-		executor := newAssertionExecutor(fs, outputs, false)
+		// Mock renderTemplate function (no-op for this test)
+		renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+			return content, nil
+		}
+
+		executor := newAssertionExecutor(
+			fs,
+			outputs,
+			false,
+			map[string]string{},
+			api.Inputs{},
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
 
 		assertions := []api.Assertion{
 			{Name: "count-1", Type: "Count", Value: 1},
@@ -97,7 +135,20 @@ metadata:
 `), 0o644)
 		require.NoError(t, err)
 
-		executor := newAssertionExecutor(fs, outputs, false)
+		// Mock renderTemplate function (no-op for this test)
+		renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+			return content, nil
+		}
+
+		executor := newAssertionExecutor(
+			fs,
+			outputs,
+			false,
+			map[string]string{},
+			api.Inputs{},
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
 
 		assertions := []api.Assertion{
 			{Name: "count-wrong", Type: "Count", Value: 999},              // Will fail
@@ -117,7 +168,20 @@ metadata:
 			Rendered: make(map[string]string),
 		}
 
-		executor := newAssertionExecutor(afero.NewMemMapFs(), outputs, false)
+		// Mock renderTemplate function (no-op for this test)
+		renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+			return content, nil
+		}
+
+		executor := newAssertionExecutor(
+			afero.NewMemMapFs(),
+			outputs,
+			false,
+			map[string]string{},
+			api.Inputs{},
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
 
 		assertions := []api.Assertion{
 			{Name: "invalid-type", Type: "InvalidType", Value: "test"},
@@ -136,7 +200,20 @@ metadata:
 			Rendered: make(map[string]string),
 		}
 
-		executor := newAssertionExecutor(afero.NewMemMapFs(), outputs, false)
+		// Mock renderTemplate function (no-op for this test)
+		renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+			return content, nil
+		}
+
+		executor := newAssertionExecutor(
+			afero.NewMemMapFs(),
+			outputs,
+			false,
+			map[string]string{},
+			api.Inputs{},
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
 
 		allResults, failedResults := executor.executeAssertions([]api.Assertion{})
 		assert.Empty(t, allResults)
@@ -162,7 +239,20 @@ func TestAssertionExecutor_executeCountAssertion(t *testing.T) {
 		err = afero.WriteFile(fs, resource2Path, []byte("apiVersion: v1\nkind: Pod\n"), 0o644)
 		require.NoError(t, err)
 
-		executor := newAssertionExecutor(fs, outputs, false)
+		// Mock renderTemplate function (no-op for this test)
+		renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+			return content, nil
+		}
+
+		executor := newAssertionExecutor(
+			fs,
+			outputs,
+			false,
+			map[string]string{},
+			api.Inputs{},
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
 
 		assertion := api.Assertion{Name: "count-test", Type: "Count", Value: 2}
 		result, err := executor.executeCountAssertion(assertion)
@@ -184,7 +274,20 @@ func TestAssertionExecutor_executeCountAssertion(t *testing.T) {
 		err := afero.WriteFile(fs, resourcePath, []byte("apiVersion: v1\nkind: Pod\n"), 0o644)
 		require.NoError(t, err)
 
-		executor := newAssertionExecutor(fs, outputs, false)
+		// Mock renderTemplate function (no-op for this test)
+		renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+			return content, nil
+		}
+
+		executor := newAssertionExecutor(
+			fs,
+			outputs,
+			false,
+			map[string]string{},
+			api.Inputs{},
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
 
 		assertion := api.Assertion{Name: "count-test", Type: "Count", Value: 5}
 		result, err := executor.executeCountAssertion(assertion)
@@ -206,7 +309,20 @@ func TestAssertionExecutor_executeCountAssertion(t *testing.T) {
 		err := afero.WriteFile(fs, resourcePath, []byte("apiVersion: v1\nkind: Pod\n"), 0o644)
 		require.NoError(t, err)
 
-		executor := newAssertionExecutor(fs, outputs, false)
+		// Mock renderTemplate function (no-op for this test)
+		renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+			return content, nil
+		}
+
+		executor := newAssertionExecutor(
+			fs,
+			outputs,
+			false,
+			map[string]string{},
+			api.Inputs{},
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
 
 		assertion := api.Assertion{Name: "count-test", Type: "Count", Value: float64(1)}
 		result, err := executor.executeCountAssertion(assertion)
@@ -220,7 +336,20 @@ func TestAssertionExecutor_executeCountAssertion(t *testing.T) {
 			Rendered: make(map[string]string),
 		}
 
-		executor := newAssertionExecutor(afero.NewMemMapFs(), outputs, false)
+		// Mock renderTemplate function (no-op for this test)
+		renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+			return content, nil
+		}
+
+		executor := newAssertionExecutor(
+			afero.NewMemMapFs(),
+			outputs,
+			false,
+			map[string]string{},
+			api.Inputs{},
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
 
 		assertion := api.Assertion{Name: "count-test", Type: "Count", Value: "not-a-number"}
 		result, err := executor.executeCountAssertion(assertion)
@@ -249,7 +378,20 @@ metadata:
 `), 0o644)
 		require.NoError(t, err)
 
-		executor := newAssertionExecutor(fs, outputs, false)
+		// Mock renderTemplate function (no-op for this test)
+		renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+			return content, nil
+		}
+
+		executor := newAssertionExecutor(
+			fs,
+			outputs,
+			false,
+			map[string]string{},
+			api.Inputs{},
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
 
 		assertion := api.Assertion{Name: "exists-test", Type: "Exists", Resource: "Pod/test-pod"}
 		result, err := executor.executeExistsAssertion(assertion)
@@ -276,7 +418,20 @@ metadata:
 `), 0o644)
 		require.NoError(t, err)
 
-		executor := newAssertionExecutor(fs, outputs, false)
+		// Mock renderTemplate function (no-op for this test)
+		renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+			return content, nil
+		}
+
+		executor := newAssertionExecutor(
+			fs,
+			outputs,
+			false,
+			map[string]string{},
+			api.Inputs{},
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
 
 		assertion := api.Assertion{Name: "exists-test", Type: "Exists", Resource: "Service/my-service"}
 		result, err := executor.executeExistsAssertion(assertion)
@@ -291,7 +446,20 @@ metadata:
 			Rendered: make(map[string]string),
 		}
 
-		executor := newAssertionExecutor(afero.NewMemMapFs(), outputs, false)
+		// Mock renderTemplate function (no-op for this test)
+		renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+			return content, nil
+		}
+
+		executor := newAssertionExecutor(
+			afero.NewMemMapFs(),
+			outputs,
+			false,
+			map[string]string{},
+			api.Inputs{},
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
 
 		assertion := api.Assertion{Name: "exists-test", Type: "Exists", Resource: ""}
 		result, err := executor.executeExistsAssertion(assertion)
@@ -306,7 +474,20 @@ metadata:
 			Rendered: make(map[string]string),
 		}
 
-		executor := newAssertionExecutor(afero.NewMemMapFs(), outputs, false)
+		// Mock renderTemplate function (no-op for this test)
+		renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+			return content, nil
+		}
+
+		executor := newAssertionExecutor(
+			afero.NewMemMapFs(),
+			outputs,
+			false,
+			map[string]string{},
+			api.Inputs{},
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
 
 		assertion := api.Assertion{Name: "exists-test", Type: "Exists", Resource: "Pod/name/extra"}
 		result, err := executor.executeExistsAssertion(assertion)
@@ -335,7 +516,20 @@ metadata:
 `), 0o644)
 		require.NoError(t, err)
 
-		executor := newAssertionExecutor(fs, outputs, false)
+		// Mock renderTemplate function (no-op for this test)
+		renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+			return content, nil
+		}
+
+		executor := newAssertionExecutor(
+			fs,
+			outputs,
+			false,
+			map[string]string{},
+			api.Inputs{},
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
 
 		assertion := api.Assertion{Name: "not-exists-test", Type: "NotExists", Resource: "Service/my-service"}
 		result, err := executor.executeNotExistsAssertion(assertion)
@@ -362,7 +556,20 @@ metadata:
 `), 0o644)
 		require.NoError(t, err)
 
-		executor := newAssertionExecutor(fs, outputs, false)
+		// Mock renderTemplate function (no-op for this test)
+		renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+			return content, nil
+		}
+
+		executor := newAssertionExecutor(
+			fs,
+			outputs,
+			false,
+			map[string]string{},
+			api.Inputs{},
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
 
 		assertion := api.Assertion{Name: "not-exists-test", Type: "NotExists", Resource: "Pod/test-pod"}
 		result, err := executor.executeNotExistsAssertion(assertion)
@@ -377,7 +584,20 @@ metadata:
 			Rendered: make(map[string]string),
 		}
 
-		executor := newAssertionExecutor(afero.NewMemMapFs(), outputs, false)
+		// Mock renderTemplate function (no-op for this test)
+		renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+			return content, nil
+		}
+
+		executor := newAssertionExecutor(
+			afero.NewMemMapFs(),
+			outputs,
+			false,
+			map[string]string{},
+			api.Inputs{},
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
 
 		assertion := api.Assertion{Name: "not-exists-test", Type: "NotExists", Resource: ""}
 		result, err := executor.executeNotExistsAssertion(assertion)
@@ -408,7 +628,20 @@ spec:
 `), 0o644)
 		require.NoError(t, err)
 
-		executor := newAssertionExecutor(fs, outputs, false)
+		// Mock renderTemplate function (no-op for this test)
+		renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+			return content, nil
+		}
+
+		executor := newAssertionExecutor(
+			fs,
+			outputs,
+			false,
+			map[string]string{},
+			api.Inputs{},
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
 
 		// YAML numbers are parsed as float64, which becomes "number" type
 		assertion := api.Assertion{
@@ -443,7 +676,20 @@ spec:
 `), 0o644)
 		require.NoError(t, err)
 
-		executor := newAssertionExecutor(fs, outputs, false)
+		// Mock renderTemplate function (no-op for this test)
+		renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+			return content, nil
+		}
+
+		executor := newAssertionExecutor(
+			fs,
+			outputs,
+			false,
+			map[string]string{},
+			api.Inputs{},
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
 
 		assertion := api.Assertion{
 			Name:     "field-type-test",
@@ -464,7 +710,20 @@ spec:
 			Rendered: make(map[string]string),
 		}
 
-		executor := newAssertionExecutor(afero.NewMemMapFs(), outputs, false)
+		// Mock renderTemplate function (no-op for this test)
+		renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+			return content, nil
+		}
+
+		executor := newAssertionExecutor(
+			afero.NewMemMapFs(),
+			outputs,
+			false,
+			map[string]string{},
+			api.Inputs{},
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
 
 		// Missing resource
 		assertion := api.Assertion{Name: "field-type-test", Type: "FieldType", Field: "spec.replicas", Value: "int"}
@@ -502,7 +761,20 @@ spec:
 `), 0o644)
 		require.NoError(t, err)
 
-		executor := newAssertionExecutor(fs, outputs, false)
+		// Mock renderTemplate function (no-op for this test)
+		renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+			return content, nil
+		}
+
+		executor := newAssertionExecutor(
+			fs,
+			outputs,
+			false,
+			map[string]string{},
+			api.Inputs{},
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
 
 		assertion := api.Assertion{
 			Name:     "field-exists-test",
@@ -535,7 +807,20 @@ spec: {}
 `), 0o644)
 		require.NoError(t, err)
 
-		executor := newAssertionExecutor(fs, outputs, false)
+		// Mock renderTemplate function (no-op for this test)
+		renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+			return content, nil
+		}
+
+		executor := newAssertionExecutor(
+			fs,
+			outputs,
+			false,
+			map[string]string{},
+			api.Inputs{},
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
 
 		assertion := api.Assertion{
 			Name:     "field-exists-test",
@@ -570,7 +855,20 @@ spec: {}
 `), 0o644)
 		require.NoError(t, err)
 
-		executor := newAssertionExecutor(fs, outputs, false)
+		// Mock renderTemplate function (no-op for this test)
+		renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+			return content, nil
+		}
+
+		executor := newAssertionExecutor(
+			fs,
+			outputs,
+			false,
+			map[string]string{},
+			api.Inputs{},
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
 
 		assertion := api.Assertion{
 			Name:     "field-not-exists-test",
@@ -604,7 +902,20 @@ spec:
 `), 0o644)
 		require.NoError(t, err)
 
-		executor := newAssertionExecutor(fs, outputs, false)
+		// Mock renderTemplate function (no-op for this test)
+		renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+			return content, nil
+		}
+
+		executor := newAssertionExecutor(
+			fs,
+			outputs,
+			false,
+			map[string]string{},
+			api.Inputs{},
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
 
 		assertion := api.Assertion{
 			Name:     "field-not-exists-test",
@@ -640,7 +951,20 @@ spec:
 `), 0o644)
 		require.NoError(t, err)
 
-		executor := newAssertionExecutor(fs, outputs, false)
+		// Mock renderTemplate function (no-op for this test)
+		renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+			return content, nil
+		}
+
+		executor := newAssertionExecutor(
+			fs,
+			outputs,
+			false,
+			map[string]string{},
+			api.Inputs{},
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
 
 		assertion := api.Assertion{
 			Name:     "field-value-test",
@@ -675,7 +999,20 @@ spec:
 `), 0o644)
 		require.NoError(t, err)
 
-		executor := newAssertionExecutor(fs, outputs, false)
+		// Mock renderTemplate function (no-op for this test)
+		renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+			return content, nil
+		}
+
+		executor := newAssertionExecutor(
+			fs,
+			outputs,
+			false,
+			map[string]string{},
+			api.Inputs{},
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
 
 		assertion := api.Assertion{
 			Name:     "field-value-test",
@@ -697,7 +1034,20 @@ spec:
 			Rendered: make(map[string]string),
 		}
 
-		executor := newAssertionExecutor(afero.NewMemMapFs(), outputs, false)
+		// Mock renderTemplate function (no-op for this test)
+		renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+			return content, nil
+		}
+
+		executor := newAssertionExecutor(
+			afero.NewMemMapFs(),
+			outputs,
+			false,
+			map[string]string{},
+			api.Inputs{},
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
 
 		// Missing resource
 		assertion := api.Assertion{Name: "field-value-test", Type: "FieldValue", Field: "spec.replicas", Operator: "==", Value: float64(3)}
@@ -747,7 +1097,20 @@ spec:
 `), 0o644)
 		require.NoError(t, err)
 
-		executor := newAssertionExecutor(fs, outputs, false)
+		// Mock renderTemplate function (no-op for this test)
+		renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+			return content, nil
+		}
+
+		executor := newAssertionExecutor(
+			fs,
+			outputs,
+			false,
+			map[string]string{},
+			api.Inputs{},
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
 
 		assertion := api.Assertion{
 			Name:     "field-value-test",
@@ -771,7 +1134,20 @@ func TestAssertionExecutor_executeAssertion(t *testing.T) {
 			Rendered: make(map[string]string),
 		}
 
-		executor := newAssertionExecutor(afero.NewMemMapFs(), outputs, false)
+		// Mock renderTemplate function (no-op for this test)
+		renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+			return content, nil
+		}
+
+		executor := newAssertionExecutor(
+			afero.NewMemMapFs(),
+			outputs,
+			false,
+			map[string]string{},
+			api.Inputs{},
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
 
 		// Test Count
 		assertion := api.Assertion{Name: "test", Type: "Count", Value: 0}
@@ -785,5 +1161,198 @@ func TestAssertionExecutor_executeAssertion(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, engine.StatusFail, result.Status)
 		assert.Contains(t, result.Message, "unsupported assertion type")
+	})
+}
+
+func TestAssertionExecutor_processTemplateVariables(t *testing.T) {
+	t.Run("processes template variables in assertion fields", func(t *testing.T) {
+		fs := afero.NewMemMapFs()
+		resourcePath := testResource1File
+		outputs := &engine.Outputs{
+			Rendered: map[string]string{
+				"resource1.yaml": resourcePath,
+			},
+		}
+
+		err := afero.WriteFile(fs, resourcePath, []byte(`
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod
+spec:
+  replicas: 3
+`), 0o644)
+		require.NoError(t, err)
+
+		// Mock renderTemplate function that processes templates
+		renderTemplate := func(content string, templateContext *templateContext, templateName string) (string, error) {
+			tmpl, err := template.New(templateName).Option("missingkey=error").Parse(content)
+			if err != nil {
+				return "", err
+			}
+
+			var buf strings.Builder
+			if err := tmpl.Execute(&buf, templateContext); err != nil {
+				return "", err
+			}
+
+			return buf.String(), nil
+		}
+
+		repositories := map[string]string{
+			"myrepo": "/path/to/repo",
+		}
+
+		inputs := api.Inputs{
+			XR:          "my-xr.yaml",
+			Composition: "my-composition.yaml",
+		}
+
+		executor := newAssertionExecutor(
+			fs,
+			outputs,
+			false,
+			repositories,
+			inputs,
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
+
+		// Create assertion with template variables
+		assertion := api.Assertion{
+			Name:     testexecutionUtils.CreatePlaceholder(".Inputs.XR"),
+			Type:     "Exists",
+			Resource: testexecutionUtils.CreatePlaceholder(".Inputs.Composition"),
+			Field:    "spec.replicas",
+		}
+
+		// Process template variables
+		processed, err := executor.processTemplateVariables(assertion)
+		require.NoError(t, err)
+
+		// Verify template variables were processed
+		assert.Equal(t, "my-xr.yaml", processed.Name)
+		assert.Equal(t, "my-composition.yaml", processed.Resource)
+		assert.Equal(t, "spec.replicas", processed.Field) // No template var, should remain unchanged
+	})
+
+	t.Run("processes template variables in value field", func(t *testing.T) {
+		fs := afero.NewMemMapFs()
+		outputs := &engine.Outputs{
+			Rendered: make(map[string]string),
+		}
+
+		// Mock renderTemplate function that processes templates
+		renderTemplate := func(content string, templateContext *templateContext, templateName string) (string, error) {
+			tmpl, err := template.New(templateName).Option("missingkey=error").Parse(content)
+			if err != nil {
+				return "", err
+			}
+
+			var buf strings.Builder
+			if err := tmpl.Execute(&buf, templateContext); err != nil {
+				return "", err
+			}
+
+			return buf.String(), nil
+		}
+
+		inputs := api.Inputs{
+			XR: "my-xr.yaml",
+		}
+
+		executor := newAssertionExecutor(
+			fs,
+			outputs,
+			false,
+			map[string]string{},
+			inputs,
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
+
+		// Create assertion with template variable in value field
+		assertion := api.Assertion{
+			Name:  "test",
+			Type:  "FieldValue",
+			Value: testexecutionUtils.CreatePlaceholder(".Inputs.XR"),
+		}
+
+		// Process template variables
+		processed, err := executor.processTemplateVariables(assertion)
+		require.NoError(t, err)
+
+		// Verify template variable was processed
+		assert.Equal(t, "my-xr.yaml", processed.Value)
+	})
+
+	t.Run("handles assertions without template variables", func(t *testing.T) {
+		fs := afero.NewMemMapFs()
+		outputs := &engine.Outputs{
+			Rendered: make(map[string]string),
+		}
+
+		// Mock renderTemplate function (should not be called)
+		renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+			return content, nil
+		}
+
+		executor := newAssertionExecutor(
+			fs,
+			outputs,
+			false,
+			map[string]string{},
+			api.Inputs{},
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
+
+		// Create assertion without template variables
+		assertion := api.Assertion{
+			Name:     "test-assertion",
+			Type:     "Count",
+			Resource: "Pod/test-pod",
+			Value:    1,
+		}
+
+		// Process template variables
+		processed, err := executor.processTemplateVariables(assertion)
+		require.NoError(t, err)
+
+		// Verify assertion remains unchanged
+		assert.Equal(t, assertion, processed)
+	})
+
+	t.Run("handles template processing errors gracefully", func(t *testing.T) {
+		fs := afero.NewMemMapFs()
+		outputs := &engine.Outputs{
+			Rendered: make(map[string]string),
+		}
+
+		// Mock renderTemplate function that returns an error
+		renderTemplate := func(_ string, _ *templateContext, _ string) (string, error) {
+			return "", fmt.Errorf("template error")
+		}
+
+		executor := newAssertionExecutor(
+			fs,
+			outputs,
+			false,
+			map[string]string{},
+			api.Inputs{},
+			map[string]*engine.TestCaseResult{},
+			renderTemplate,
+		)
+
+		// Create assertion with template variable
+		assertion := api.Assertion{
+			Name: testexecutionUtils.CreatePlaceholder(".Inputs.XR"),
+			Type: "Count",
+		}
+
+		// Process template variables - should return error
+		_, err := executor.processTemplateVariables(assertion)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to process template")
 	})
 }

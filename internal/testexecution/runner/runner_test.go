@@ -3150,11 +3150,11 @@ metadata:
 	assert.Equal(t, "echo 'Setting up without templates'", testCase.Hooks.PreTest[0].Run)
 }
 
-// TestRemoveHooks tests the removeHooks function.
-func TestRemoveHooks(t *testing.T) {
+// TestRemoveHooksAndAssertions tests the removeHooksAndAssertions function.
+func TestRemoveHooksAndAssertions(t *testing.T) {
 	runner := &Runner{}
 
-	// Create a test case with hooks
+	// Create a test case with hooks and assertions
 	testCase := api.TestCase{
 		Name: "test",
 		ID:   "test-id",
@@ -3170,22 +3170,29 @@ func TestRemoveHooks(t *testing.T) {
 				{Name: "post-test", Run: "echo 'post-test'"},
 			},
 		},
+		Assertions: api.Assertions{
+			Xprin: []api.Assertion{
+				{Name: "test-assertion", Type: "Count", Value: 3},
+			},
+		},
 	}
 
-	// Remove all hooks
-	_, err := runner.removeHooks(&testCase)
+	// Remove all hooks and assertions
+	_, err := runner.removeHooksAndAssertions(&testCase)
 	require.NoError(t, err)
 
 	// Verify both pre-test and post-test hooks were removed
 	assert.Nil(t, testCase.Hooks.PreTest)
 	assert.Nil(t, testCase.Hooks.PostTest)
+	// Verify assertions were removed
+	assert.Nil(t, testCase.Assertions.Xprin)
 }
 
-// TestRestoreHooks tests the restoreHooks function.
-func TestRestoreHooks(t *testing.T) {
+// TestRestoreHooksAndAssertions tests the restoreHooksAndAssertions function.
+func TestRestoreHooksAndAssertions(t *testing.T) {
 	runner := &Runner{}
 
-	// Original test case with hooks
+	// Original test case with hooks and assertions
 	originalTestCase := api.TestCase{
 		Name: "test",
 		ID:   "test-id",
@@ -3201,25 +3208,31 @@ func TestRestoreHooks(t *testing.T) {
 				{Name: "post-test", Run: "echo 'post-test'"},
 			},
 		},
+		Assertions: api.Assertions{
+			Xprin: []api.Assertion{
+				{Name: "test-assertion", Type: "Count", Value: 3},
+			},
+		},
 	}
 
-	// Create processed YAML without hooks (as would happen after template processing)
+	// Create processed YAML without hooks and assertions (as would happen after template processing)
 	processedTestCase := api.TestCase{
 		Name: "test",
 		ID:   "test-id",
 		Inputs: api.Inputs{
 			XR:          "xr.yaml",
 			Composition: "comp.yaml",
-			// Hooks removed for template processing
+			// Hooks and assertions removed for template processing
 		},
 	}
 
 	processedYAML, err := yaml.Marshal(processedTestCase)
 	require.NoError(t, err)
 
-	// Restore hooks
+	// Restore hooks and assertions
 	originalHooks := originalTestCase.Hooks
-	err = runner.restoreHooks(string(processedYAML), &originalTestCase, originalHooks)
+	originalAssertions := originalTestCase.Assertions
+	err = runner.restoreHooksAndAssertions(string(processedYAML), &originalTestCase, originalHooks, originalAssertions)
 	require.NoError(t, err)
 
 	// Verify hooks were restored
@@ -3229,6 +3242,12 @@ func TestRestoreHooks(t *testing.T) {
 	assert.Equal(t, "post-test", originalTestCase.Hooks.PostTest[0].Name)
 	assert.Equal(t, "echo 'pre-test'", originalTestCase.Hooks.PreTest[0].Run)
 	assert.Equal(t, "echo 'post-test'", originalTestCase.Hooks.PostTest[0].Run)
+
+	// Verify assertions were restored
+	assert.Len(t, originalTestCase.Assertions.Xprin, 1)
+	assert.Equal(t, "test-assertion", originalTestCase.Assertions.Xprin[0].Name)
+	assert.Equal(t, "Count", originalTestCase.Assertions.Xprin[0].Type)
+	assert.Equal(t, 3, originalTestCase.Assertions.Xprin[0].Value)
 }
 
 // TestRunTestCase_Outputs tests that output files are written to the outputs directory.

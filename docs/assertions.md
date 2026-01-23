@@ -465,6 +465,67 @@ Field access handles:
 - Null values (treated as `null` type)
 - Array indexing (not directly supported, use array operations)
 
+## Template Variables
+
+Assertions support template variable expansion in all fields (`name`, `resource`, `field`, `operator`, and `value`). Template variables are processed before assertion execution, enabling dynamic assertions based on rendered outputs, inputs, and cross-test references.
+
+### Available Variables
+
+**Input Variables:**
+- `{{ .Inputs.XR }}` - XR file path
+- `{{ .Inputs.Claim }}` - Claim file path
+- `{{ .Inputs.Composition }}` - Composition file path
+- `{{ .Inputs.Functions }}` - Functions directory path
+- All other input fields via `{{ .Inputs.FieldName }}`
+
+**Output Variables:**
+- `{{ .Outputs.XR }}` - XR file path
+- `{{ .Outputs.Render }}` - Full rendered output path
+- `{{ .Outputs.Validate }}` - Validation output path
+- `{{ .Outputs.RenderCount }}` - Number of rendered resources
+- `{{ index .Outputs.Rendered "Kind/Name" }}` - Individual resource paths
+
+**Repository Variables:**
+- `{{ .Repositories.name }}` - Repository paths from configuration
+
+**Cross-test References:**
+- `{{ .Tests.{test-id}.Outputs.* }}` - Access outputs from previous tests
+- Only available for tests with `id` field
+- Only available after the referenced test has completed
+
+### Examples
+
+**Using Output Variables:**
+```yaml
+assertions:
+  xprin:
+    - name: "count-matches-rendered"
+      type: "Count"
+      value: {{ .Outputs.RenderCount }}
+    
+    - name: "resource-exists"
+      type: "Exists"
+      resource: "Deployment/{{ .Inputs.XR | basename }}"
+```
+
+**Using Cross-test References:**
+```yaml
+assertions:
+  xprin:
+    - name: "count-matches-previous-test"
+      type: "Count"
+      value: {{ .Tests.test1.Outputs.RenderCount }}
+    
+    - name: "field-matches-previous-output"
+      type: "FieldValue"
+      resource: "Deployment/my-app"
+      field: "spec.replicas"
+      operator: "=="
+      value: {{ .Tests.test1.Outputs.SomeComputedValue }}
+```
+
+For detailed information about template variables, see [How It Works](how-it-works.md#template-variable-expansion).
+
 ## Execution and Error Handling
 
 **Execution Order:**

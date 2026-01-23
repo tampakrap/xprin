@@ -193,6 +193,12 @@ flowchart TD
 - Resources are identified by `Kind/name` format
 - Field paths use dot notation (e.g., `spec.replicas`, `metadata.labels.app`)
 
+**Template Variables Available:**
+- All input variables (XR, Claim, Composition, Functions, etc.)
+- All output variables (XR, Render, Validate, RenderCount, Rendered)
+- Repository variables
+- Cross-test references (from previous tests with IDs)
+
 ### Phase 6: Finish
 
 **What happens:**
@@ -325,6 +331,7 @@ Template variables use Go's `text/template` package for dynamic content.
 
 - **Input Expansion**: Happens during setup phase, before file copying
 - **Hook Expansion**: Happens when hooks are executed (pre-test or post-test)
+- **Assertion Expansion**: Happens when assertions are executed (after rendering/validation)
 
 ### Available Variables
 
@@ -338,7 +345,7 @@ Template variables use Go's `text/template` package for dynamic content.
 - `{{ .Inputs.Functions }}` - Functions directory path
 - All other input fields are available via `{{ .Inputs.FieldName }}`
 
-**Output Variables** (post-test hooks only):
+**Output Variables** (available in assertions and post-test hooks):
 - `{{ .Outputs.XR }}` - XR file path
 - `{{ .Outputs.Render }}` - Full rendered output path
 - `{{ .Outputs.Validate }}` - Validation output path

@@ -58,6 +58,8 @@ func (e *hookExecutor) executeHooks(hooks []api.Hook, hookType string, inputs ap
 	for _, hook := range hooks {
 		var err error
 
+		// Preserve original command for HookResult (to preserve original command in error messages)
+		originalCommand := hook.Run
 		finalCommand := hook.Run
 
 		// Restore template variables in hook command and re-process with current context
@@ -71,15 +73,15 @@ func (e *hookExecutor) executeHooks(hooks []api.Hook, hookType string, inputs ap
 			if err != nil {
 				// Create HookResult for template rendering failure (for consistency with command execution failures)
 				templateErr := fmt.Errorf("failed to render hook template: %w", err)
-				hookResult := engine.NewHookResult(hook.Name, hook.Run, nil, nil, templateErr)
+				hookResult := engine.NewHookResult(hook.Name, originalCommand, nil, nil, templateErr)
 				hookResults = append(hookResults, hookResult)
 
 				// Create error message similar to command execution failures
 				var errorMsg string
 				if hook.Name != "" {
-					errorMsg = fmt.Sprintf("%s hook '%s' failed to render template: %s: %v", hookType, hook.Name, hook.Run, err)
+					errorMsg = fmt.Sprintf("%s hook '%s' failed to render template: %s: %v", hookType, hook.Name, originalCommand, err)
 				} else {
-					errorMsg = fmt.Sprintf("%s hook failed to render template: %s: %v", hookType, hook.Run, err)
+					errorMsg = fmt.Sprintf("%s hook failed to render template: %s: %v", hookType, originalCommand, err)
 				}
 
 				return hookResults, errors.New(errorMsg)
@@ -96,8 +98,8 @@ func (e *hookExecutor) executeHooks(hooks []api.Hook, hookType string, inputs ap
 
 		stdout, stderr, err := e.runCommand("sh", "-c", finalCommand)
 
-		// Use original hook for the result (to preserve original command in error messages)
-		hookResult := engine.NewHookResult(hook.Name, hook.Run, stdout, stderr, err)
+		// Use original command for the result (to preserve original command in error messages)
+		hookResult := engine.NewHookResult(hook.Name, originalCommand, stdout, stderr, err)
 		hookResults = append(hookResults, hookResult)
 
 		if err != nil {

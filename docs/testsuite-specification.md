@@ -208,7 +208,7 @@ Available in hooks and other test case fields:
 - All other input fields via `{{ .Inputs.FieldName }}`
 
 ### Output Variables
-Available in post-test hooks only:
+Available in assertions and post-test hooks:
 - `{{ .Outputs.XR }}` - XR file path
 - `{{ .Outputs.Render }}` - Full rendered output path
 - `{{ .Outputs.Validate }}` - Validation output path

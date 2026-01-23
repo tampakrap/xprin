@@ -408,6 +408,9 @@ func TestExecuteHooks_PreTestHooks_OutputsTemplateVariables(t *testing.T) {
 	require.NotNil(t, results)
 	require.Len(t, results, 1)
 	assert.Equal(t, "pre-hook-with-outputs", results[0].Name)
+	// Command should preserve the original with placeholders
+	expectedCommand := fmt.Sprintf("echo 'Outputs XR: %s.Outputs.XR%s'", testexecutionUtils.PlaceholderOpen, testexecutionUtils.PlaceholderClose)
+	assert.Equal(t, expectedCommand, results[0].Command)
 	require.Error(t, results[0].Error)
 	assert.Contains(t, results[0].Error.Error(), "failed to render hook template")
 	assert.Contains(t, err.Error(), "failed to render template")

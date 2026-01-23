@@ -23,6 +23,7 @@ import (
 
 	"github.com/crossplane-contrib/xprin/internal/api"
 	"github.com/crossplane-contrib/xprin/internal/engine"
+	testexecutionUtils "github.com/crossplane-contrib/xprin/internal/testexecution/utils"
 	"github.com/spf13/afero"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/yaml"
@@ -30,17 +31,33 @@ import (
 
 // assertionExecutor handles execution of assertions.
 type assertionExecutor struct {
-	fs      afero.Fs
-	outputs *engine.Outputs
-	debug   bool
+	fs             afero.Fs
+	outputs        *engine.Outputs
+	debug          bool
+	repositories   map[string]string
+	inputs         api.Inputs
+	tests          map[string]*engine.TestCaseResult
+	renderTemplate func(content string, templateContext *templateContext, templateName string) (string, error)
 }
 
 // newAssertionExecutor creates a new assertion executor.
-func newAssertionExecutor(fs afero.Fs, outputs *engine.Outputs, debug bool) *assertionExecutor {
+func newAssertionExecutor(
+	fs afero.Fs,
+	outputs *engine.Outputs,
+	debug bool,
+	repositories map[string]string,
+	inputs api.Inputs,
+	tests map[string]*engine.TestCaseResult,
+	renderTemplate func(content string, templateContext *templateContext, templateName string) (string, error),
+) *assertionExecutor {
 	return &assertionExecutor{
-		fs:      fs,
-		outputs: outputs,
-		debug:   debug,
+		fs:             fs,
+		outputs:        outputs,
+		debug:          debug,
+		repositories:   repositories,
+		inputs:         inputs,
+		tests:          tests,
+		renderTemplate: renderTemplate,
 	}
 }
 
@@ -50,7 +67,22 @@ func (e *assertionExecutor) executeAssertions(assertions []api.Assertion) ([]eng
 	assertionsFailedResults := make([]engine.AssertionResult, 0, len(assertions))
 
 	for _, assertion := range assertions {
-		assertionResult, _ := e.executeAssertion(assertion)
+		// Process template variables in assertion before execution
+		processedAssertion, err := e.processTemplateVariables(assertion)
+		if err != nil {
+			// If template processing fails, create a failed assertion result
+			assertionResult := engine.NewAssertionResult(
+				assertion.Name,
+				engine.StatusFail,
+				fmt.Sprintf("failed to process template variables: %v", err),
+			)
+			assertionsAllResults = append(assertionsAllResults, assertionResult)
+			assertionsFailedResults = append(assertionsFailedResults, assertionResult)
+
+			continue
+		}
+
+		assertionResult, _ := e.executeAssertion(processedAssertion)
 
 		assertionsAllResults = append(assertionsAllResults, assertionResult)
 		if assertionResult.Status == engine.StatusFail {
@@ -557,6 +589,96 @@ func (e *assertionExecutor) checkFieldExists(obj map[string]interface{}, fieldPa
 	}
 
 	return false, fmt.Errorf("field %s not found", fieldPath)
+}
+
+// processTemplateVariables processes template variables in assertion fields.
+func (e *assertionExecutor) processTemplateVariables(assertion api.Assertion) (api.Assertion, error) {
+	processedAssertion := assertion
+
+	// Check if any field has template variables
+	hasTemplateVars := strings.Contains(assertion.Name, testexecutionUtils.PlaceholderOpen) ||
+		strings.Contains(assertion.Resource, testexecutionUtils.PlaceholderOpen) ||
+		strings.Contains(assertion.Field, testexecutionUtils.PlaceholderOpen) ||
+		strings.Contains(assertion.Operator, testexecutionUtils.PlaceholderOpen)
+
+	// Check Value field if it's a string
+	if assertion.Value != nil {
+		if valueStr, ok := assertion.Value.(string); ok {
+			hasTemplateVars = hasTemplateVars || strings.Contains(valueStr, testexecutionUtils.PlaceholderOpen)
+		}
+	}
+
+	// Create template context once if any template variables are present
+	var templateContext *templateContext
+	if hasTemplateVars {
+		templateContext = newTemplateContext(e.repositories, e.inputs, e.outputs, e.tests)
+	}
+
+	// Process template variables in Name field
+	if strings.Contains(assertion.Name, testexecutionUtils.PlaceholderOpen) {
+		restored := testexecutionUtils.RestoreTemplateVars(assertion.Name)
+
+		processed, err := e.renderTemplate(restored, templateContext, "assertion-name")
+		if err != nil {
+			return processedAssertion, fmt.Errorf("failed to process template in assertion name: %w", err)
+		}
+
+		processedAssertion.Name = processed
+	}
+
+	// Process template variables in Resource field
+	if strings.Contains(assertion.Resource, testexecutionUtils.PlaceholderOpen) {
+		restored := testexecutionUtils.RestoreTemplateVars(assertion.Resource)
+
+		processed, err := e.renderTemplate(restored, templateContext, "assertion-resource")
+		if err != nil {
+			return processedAssertion, fmt.Errorf("failed to process template in assertion resource: %w", err)
+		}
+
+		processedAssertion.Resource = processed
+	}
+
+	// Process template variables in Field field
+	if strings.Contains(assertion.Field, testexecutionUtils.PlaceholderOpen) {
+		restored := testexecutionUtils.RestoreTemplateVars(assertion.Field)
+
+		processed, err := e.renderTemplate(restored, templateContext, "assertion-field")
+		if err != nil {
+			return processedAssertion, fmt.Errorf("failed to process template in assertion field: %w", err)
+		}
+
+		processedAssertion.Field = processed
+	}
+
+	// Process template variables in Operator field
+	if strings.Contains(assertion.Operator, testexecutionUtils.PlaceholderOpen) {
+		restored := testexecutionUtils.RestoreTemplateVars(assertion.Operator)
+
+		processed, err := e.renderTemplate(restored, templateContext, "assertion-operator")
+		if err != nil {
+			return processedAssertion, fmt.Errorf("failed to process template in assertion operator: %w", err)
+		}
+
+		processedAssertion.Operator = processed
+	}
+
+	// Process template variables in Value field (if it's a string)
+	if assertion.Value != nil {
+		if valueStr, ok := assertion.Value.(string); ok {
+			if strings.Contains(valueStr, testexecutionUtils.PlaceholderOpen) {
+				restored := testexecutionUtils.RestoreTemplateVars(valueStr)
+
+				processed, err := e.renderTemplate(restored, templateContext, "assertion-value")
+				if err != nil {
+					return processedAssertion, fmt.Errorf("failed to process template in assertion value: %w", err)
+				}
+
+				processedAssertion.Value = processed
+			}
+		}
+	}
+
+	return processedAssertion, nil
 }
 
 // getGoType returns the Go type name for a value.

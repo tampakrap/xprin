@@ -666,7 +666,15 @@ func (r *Runner) runTestCase(testCase api.TestCase, testSuiteResult *engine.Test
 			utils.DebugPrintf("Executing %d assertions for test case '%s'\n", len(testCase.Assertions.Xprin), testCase.Name)
 		}
 
-		assertionExecutor := newAssertionExecutor(r.fs, &result.Outputs, r.Debug)
+		assertionExecutor := newAssertionExecutor(
+			r.fs,
+			&result.Outputs,
+			r.Debug,
+			r.Repositories,
+			testCase.Inputs,
+			testSuiteResult.GetCompletedTests(),
+			r.renderTemplate,
+		)
 
 		// Store assertion results in test case result
 		result.AssertionsAllResults, result.AssertionsFailedResults = assertionExecutor.executeAssertions(testCase.Assertions.Xprin)
@@ -766,12 +774,13 @@ func (r *Runner) processTemplateVariables(testCase *api.TestCase, testSuiteResul
 		return nil // No template variables to process
 	}
 
-	// Preserve hooks from testCase before removeHooks modifies them
+	// Preserve hooks and assertions from testCase before removeHooksAndAssertions modifies them
 	originalHooks := testCase.Hooks
+	originalAssertions := testCase.Assertions
 
-	content, err = r.removeHooks(testCase)
+	content, err = r.removeHooksAndAssertions(testCase)
 	if err != nil {
-		return fmt.Errorf("failed to remove hooks from YAML: %w", err)
+		return fmt.Errorf("failed to remove hooks and assertions from YAML: %w", err)
 	}
 
 	content = testexecutionUtils.RestoreTemplateVars(content)
@@ -784,16 +793,16 @@ func (r *Runner) processTemplateVariables(testCase *api.TestCase, testSuiteResul
 		return fmt.Errorf("failed to render template: %w", err)
 	}
 
-	// Parse the processed YAML back to test case and restore hooks
-	if err := r.restoreHooks(content, testCase, originalHooks); err != nil {
-		return fmt.Errorf("failed to restore hooks: %w", err)
+	// Parse the processed YAML back to test case and restore hooks and assertions
+	if err := r.restoreHooksAndAssertions(content, testCase, originalHooks, originalAssertions); err != nil {
+		return fmt.Errorf("failed to restore hooks and assertions: %w", err)
 	}
 
 	return nil
 }
 
-// removeHooks removes all hooks from the test case.
-func (r *Runner) removeHooks(testCase *api.TestCase) (string, error) {
+// removeHooksAndAssertions removes all hooks and assertions from the test case.
+func (r *Runner) removeHooksAndAssertions(testCase *api.TestCase) (string, error) {
 	if testCase.Hooks.PreTest != nil {
 		testCase.Hooks.PreTest = nil
 	}
@@ -801,6 +810,8 @@ func (r *Runner) removeHooks(testCase *api.TestCase) (string, error) {
 	if testCase.Hooks.PostTest != nil {
 		testCase.Hooks.PostTest = nil
 	}
+
+	testCase.Assertions = api.Assertions{}
 
 	yamlData, err := yaml.Marshal(testCase)
 	if err != nil {
@@ -810,15 +821,16 @@ func (r *Runner) removeHooks(testCase *api.TestCase) (string, error) {
 	return string(yamlData), nil
 }
 
-// restoreHooks parses the processed YAML back to test case and restores hooks.
-func (r *Runner) restoreHooks(content string, testCase *api.TestCase, originalHooks api.Hooks) error {
+// restoreHooksAndAssertions parses the processed YAML back to test case and restores hooks and assertions.
+func (r *Runner) restoreHooksAndAssertions(content string, testCase *api.TestCase, originalHooks api.Hooks, originalAssertions api.Assertions) error {
 	// Parse the processed YAML back to test case
 	if err := yaml.Unmarshal([]byte(content), testCase); err != nil {
 		return fmt.Errorf("failed to parse processed YAML: %w", err)
 	}
 
-	// Restore hooks (they will be processed in executeHooks with the correct context)
+	// Restore hooks and assertions (they will be processed in executeHooks/executeAssertions with the correct context)
 	testCase.Hooks = originalHooks
+	testCase.Assertions = originalAssertions
 
 	return nil
 }
