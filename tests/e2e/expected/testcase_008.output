@@ -1,0 +1,24 @@
+=== RUN   Base layer final loop
+--- PASS: Base layer final loop (X.XXXs)
+    Rendered resources:
+        ├── XBaseInfrastructure/platform-base
+        ├── XAWSInfrastructure/platform-base-aws
+        ├── XGCPInfrastructure/platform-base-gcp
+        └── Object/platform-base-base-namespace
+    Validation results:
+        [✓] base.example.com/v1, Kind=XBaseInfrastructure, platform-base validated successfully
+        [✓] aws.example.com/v1, Kind=XAWSInfrastructure, platform-base-aws validated successfully
+        [✓] gcp.example.com/v1, Kind=XGCPInfrastructure, platform-base-gcp validated successfully
+        [✓] kubernetes.crossplane.io/v1alpha2, Kind=Object, platform-base-base-namespace validated successfully
+        Total 4 resources: 0 missing schemas, 4 success cases, 0 failure cases
+=== RUN   AWS layer first loop
+--- PASS: AWS layer first loop (X.XXXs)
+    Rendered resources:
+        ├── XAWSInfrastructure/platform-base-aws
+        └── SecurityGroup/platform-base-aws-sg
+    Validation results:
+        [✓] aws.example.com/v1, Kind=XAWSInfrastructure, platform-base-aws validated successfully
+        [✓] ec2.aws.upbound.io/v1beta1, Kind=SecurityGroup, platform-base-aws-sg validated successfully
+        Total 2 resources: 0 missing schemas, 2 success cases, 0 failure cases
+PASS
+ok	examples/mytests/5_chained_tests/example2_cross-composition-chaining_xprin.yaml	X.XXXs

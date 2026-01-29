@@ -1,0 +1,3 @@
+ok	examples/mytests/1_simple_tests/example1_using-xr_xprin.yaml	X.XXXs
+ok	examples/mytests/1_simple_tests/example2_using-claim_xprin.yaml	X.XXXs
+ok	examples/mytests/2_multiple_testcases/example2_multiple-reconciliation-loops-using-common_xprin.yaml	X.XXXs

@@ -1,0 +1,180 @@
+#!/bin/bash
+# run.sh - Single test runner for e2e tests
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+EXPECTED_DIR="${SCRIPT_DIR}/../expected"
+TESTCASES_FILE="${SCRIPT_DIR}/testcases.sh"
+NORMALIZE_SCRIPT="${SCRIPT_DIR}/normalize.sh"
+XPRIN_BIN="${XPRIN_BIN:-${PROJECT_ROOT}/xprin}"
+STATUS=0
+
+cd "${PROJECT_ROOT}"
+
+if [ ! -f "${TESTCASES_FILE}" ]; then
+    echo "Test case list not found: ${TESTCASES_FILE}"
+    exit 1
+fi
+
+# Ensure xprin binary exists
+if [ ! -x "${XPRIN_BIN}" ]; then
+    echo "xprin binary not found or not executable: ${XPRIN_BIN}"
+    echo "Run: make xprin-build"
+    exit 1
+fi
+
+# shellcheck source=/dev/null
+source "${TESTCASES_FILE}"
+
+if [ ! -f "${NORMALIZE_SCRIPT}" ]; then
+    echo "Normalize script not found: ${NORMALIZE_SCRIPT}"
+    exit 1
+fi
+
+# Resolve Crossplane major version (1 or 2) for version-specific expected output.
+# Prefer CROSSPLANE_VERSION env (set by Earthly); otherwise detect from crossplane CLI.
+if [ -n "${CROSSPLANE_VERSION:-}" ]; then
+    if [[ "${CROSSPLANE_VERSION}" == v1.* ]]; then
+        XP_MAJOR=1
+    elif [[ "${CROSSPLANE_VERSION}" == v2.* ]]; then
+        XP_MAJOR=2
+    else
+        echo "Unknown CROSSPLANE_VERSION format: ${CROSSPLANE_VERSION}; defaulting to v2"
+        XP_MAJOR=2
+    fi
+else
+    XP_VER="$(crossplane version --client 2>/dev/null | cut -d':' -f2 | xargs || true)"
+    if [[ "${XP_VER}" == v1.* ]]; then
+        XP_MAJOR=1
+    elif [[ "${XP_VER}" == v2.* ]]; then
+        XP_MAJOR=2
+    else
+        echo "Could not detect Crossplane version (crossplane version output: '${XP_VER}'); defaulting to v2"
+        XP_MAJOR=2
+    fi
+fi
+echo "Using Crossplane major version: v${XP_MAJOR} (expected files: testcase_<id>.output or testcase_<id>.v${XP_MAJOR}.output)"
+echo ""
+
+TEST_CASES=($(compgen -v | grep '^testcase_' | grep -v '_exit$' | sort))
+
+if [ "${#TEST_CASES[@]}" -eq 0 ]; then
+    echo "No test cases defined in ${TESTCASES_FILE}"
+    exit 1
+fi
+
+PASSED=0
+FAILED=0
+FAILED_TESTS=()
+TMPDIRS=()
+
+trap 'for d in "${TMPDIRS[@]}"; do rm -rf "${d}"; done' EXIT
+
+for test_var in "${TEST_CASES[@]}"; do
+    test_id="${test_var#testcase_}"
+    test_args="${!test_var}"
+    exit_var="${test_var}_exit"
+    expected_exit="${!exit_var:-0}"
+
+    if [ -z "${test_id}" ] || [ -z "${test_args}" ]; then
+        echo "Invalid test case entry: ${test_var}"
+        exit 1
+    fi
+
+    echo "Running testcase_${test_id}..."
+
+    TMPDIR="$(mktemp -d)"
+    TMPDIRS+=("${TMPDIR}")
+
+    # Prefer version-specific expected file (.v1.output / .v2.output) if present; else default .output
+    EXPECTED_VERSIONED="${EXPECTED_DIR}/testcase_${test_id}.v${XP_MAJOR}.output"
+    if [ -f "${EXPECTED_VERSIONED}" ]; then
+        EXPECTED_OUTPUT="${EXPECTED_VERSIONED}"
+    else
+        EXPECTED_OUTPUT="${EXPECTED_DIR}/testcase_${test_id}.output"
+    fi
+    ACTUAL_OUTPUT="${TMPDIR}/actual.output"
+    NORMALIZED_OUTPUT="${TMPDIR}/normalized.output"
+
+    read -ra cmd_args <<< "${test_args}"
+
+    set +e
+    "${XPRIN_BIN}" test "${cmd_args[@]}" > "${ACTUAL_OUTPUT}" 2>&1
+    EXIT_CODE=$?
+    set -e
+
+    "${NORMALIZE_SCRIPT}" "${ACTUAL_OUTPUT}" > "${NORMALIZED_OUTPUT}"
+
+    TEST_FAILED=0
+
+    if [ ! -f "${EXPECTED_OUTPUT}" ]; then
+        echo "FAIL: Expected file not found: ${EXPECTED_OUTPUT}"
+        echo "Please create the expected file manually."
+        TEST_FAILED=1
+    elif ! diff -u "${EXPECTED_OUTPUT}" "${NORMALIZED_OUTPUT}" > /dev/null; then
+        echo "FAIL: output mismatch for testcase_${test_id}"
+        echo "Expected:"
+        cat "${EXPECTED_OUTPUT}"
+        echo ""
+        echo "Actual:"
+        cat "${NORMALIZED_OUTPUT}"
+        echo ""
+        echo "Diff:"
+        diff -u "${EXPECTED_OUTPUT}" "${NORMALIZED_OUTPUT}" || true
+        TEST_FAILED=1
+    fi
+
+    if [ "${expected_exit}" -eq 0 ]; then
+        if [ ${EXIT_CODE} -ne 0 ]; then
+            echo "FAIL: expected exit code 0, got ${EXIT_CODE}"
+            TEST_FAILED=1
+        fi
+    else
+        if [ ${EXIT_CODE} -eq 0 ]; then
+            echo "FAIL: expected non-zero exit code, got 0"
+            TEST_FAILED=1
+        fi
+    fi
+
+    if [ ${TEST_FAILED} -eq 1 ]; then
+        FAILED=$((FAILED + 1))
+        FAILED_TESTS+=("testcase_${test_id}")
+    else
+        echo "PASS: testcase_${test_id}"
+        PASSED=$((PASSED + 1))
+    fi
+
+    rm -rf "${TMPDIR}"
+    echo ""
+done
+
+echo ""
+echo "========================================="
+echo "E2E Test Results"
+echo "========================================="
+echo "Total:  $((PASSED + FAILED))"
+echo "Passed: ${PASSED}"
+echo "Failed: ${FAILED}"
+echo ""
+
+if [ ${FAILED} -gt 0 ]; then
+    echo "Failed tests:"
+    for test in "${FAILED_TESTS[@]}"; do
+        echo "  - ${test}"
+    done
+    echo ""
+    STATUS=1
+fi
+
+echo "Toolset versions:"
+echo "- Crossplane: $(crossplane version --client | cut -d':' -f2 | xargs)"
+echo "- xprin: $("${XPRIN_BIN}" version)"
+
+if [ ${STATUS} -eq 0 ]; then
+    echo ""
+    echo "All tests passed!"
+fi
+
+exit ${STATUS}

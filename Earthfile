@@ -128,3 +128,42 @@ go-lint:
   RUN golangci-lint run --fix
   SAVE ARTIFACT cmd AS LOCAL cmd
   SAVE ARTIFACT internal AS LOCAL internal
+
+# crossplane-cli builds the Crossplane CLI binary (cached by Earthly; reused across test-e2e runs).
+crossplane-cli:
+  ARG CROSSPLANE_VERSION
+  FROM alpine:3.20
+  RUN apk add --no-cache curl
+  RUN XP_VERSION="${CROSSPLANE_VERSION}" sh -c 'curl -sL "https://raw.githubusercontent.com/crossplane/crossplane/main/install.sh" | sh'
+  RUN mv crossplane /usr/local/bin/crossplane
+  SAVE ARTIFACT /usr/local/bin/crossplane
+
+# test-e2e runs e2e tests (uses +crossplane-cli artifact so the CLI install is cached).
+test-e2e:
+  ARG TARGETARCH
+  ARG TARGETOS
+  ARG GOARCH=${TARGETARCH}
+  ARG GOOS=${TARGETOS}
+  ARG CROSSPLANE_VERSION
+  FROM earthly/dind:alpine-3.20-docker-26.1.5-r0
+  COPY +crossplane-cli/crossplane /usr/local/bin/crossplane
+  RUN apk add --no-cache bash
+  COPY +go-build/xprin .
+  COPY --dir examples/ tests/ ./
+  RUN chmod +x tests/e2e/scripts/run.sh
+  WITH DOCKER
+    RUN CROSSPLANE_VERSION=${CROSSPLANE_VERSION} /tests/e2e/scripts/run.sh
+  END
+
+# test-e2e-v1 runs tests against Crossplane v1.
+test-e2e-v1:
+  BUILD --build-arg CROSSPLANE_VERSION=v1.20.4 +test-e2e
+
+# test-e2e-v2 runs tests against Crossplane v2.
+test-e2e-v2:
+  BUILD --build-arg CROSSPLANE_VERSION=v2.1.3 +test-e2e
+
+# test-e2e-all runs the e2e tests against v1 and v2 (sequential; for local use; CI uses matrix jobs).
+test-e2e-all:
+  BUILD +test-e2e-v1
+  BUILD +test-e2e-v2
