@@ -486,6 +486,9 @@ func (r *Runner) runTestCase(testCase api.TestCase, testSuiteResult *engine.Test
 		hookExecutor := newHookExecutor(r.Repositories, r.Debug, r.runCommand, r.renderTemplate)
 
 		result.PreTestHooksResults, err = hookExecutor.executeHooks(testCase.Hooks.PreTest, "pre-test", testCase.Inputs, nil, testSuiteResult.GetCompletedTests())
+		// Format hooks output once
+		result.ProcessHooksOutput()
+
 		if err != nil {
 			return result.Fail(err)
 		}
@@ -572,19 +575,18 @@ func (r *Runner) runTestCase(testCase api.TestCase, testSuiteResult *engine.Test
 		utils.DebugPrintf("Wrote rendered output to: %s\n", result.Outputs.Render)
 	}
 
-	// Parse render output to extract XR path and resource count
-	renderedResources, err := result.ParseRenderOutput(result.RawRenderOutput)
-	if err != nil {
-		return result.Fail(fmt.Errorf("failed to parse render output: %w", err))
+	// Process render output - this sets RenderedResources and FormattedRenderOutput
+	if err := result.ProcessRenderOutput(result.RawRenderOutput); err != nil {
+		return result.Fail(fmt.Errorf("failed to process render output: %w", err))
 	}
 
-	result.Outputs.RenderCount = len(renderedResources)
+	result.Outputs.RenderCount = len(result.RenderedResources)
 
-	if len(renderedResources) > 0 {
+	if len(result.RenderedResources) > 0 {
 		// Create separate XR file with just the first resource
 		result.Outputs.XR = filepath.Join(r.outputsDir, "xr.yaml")
 
-		xrYAML, err := yaml.Marshal(renderedResources[0])
+		xrYAML, err := yaml.Marshal(result.RenderedResources[0])
 		if err != nil {
 			return result.Fail(fmt.Errorf("failed to marshal XR resource: %w", err))
 		}
@@ -595,7 +597,7 @@ func (r *Runner) runTestCase(testCase api.TestCase, testSuiteResult *engine.Test
 	}
 
 	// Process all resources for Rendered map (including XR)
-	for i, resource := range renderedResources {
+	for i, resource := range result.RenderedResources {
 		kind := resource.GetKind()
 		name := resource.GetName()
 
@@ -640,6 +642,8 @@ func (r *Runner) runTestCase(testCase api.TestCase, testSuiteResult *engine.Test
 			result.RawValidateOutput = stdout
 		}
 
+		result.ProcessValidateOutput(result.RawValidateOutput)
+
 		// Write validation output to the outputs directory
 		validateOutputFile := filepath.Join(r.outputsDir, "validate.yaml")
 		if err := afero.WriteFile(r.fs, validateOutputFile, result.RawValidateOutput, 0o600); err != nil {
@@ -668,6 +672,9 @@ func (r *Runner) runTestCase(testCase api.TestCase, testSuiteResult *engine.Test
 		// Store assertion results in test case result
 		result.AssertionsAllResults, result.AssertionsFailedResults = assertionExecutor.executeAssertions(testCase.Assertions.Xprin)
 
+		// Format assertions output once
+		result.ProcessAssertionsOutput()
+
 		if len(result.AssertionsFailedResults) > 0 {
 			finalError = append(finalError, result.MarkAssertionsFailed().Error())
 		}
@@ -682,6 +689,9 @@ func (r *Runner) runTestCase(testCase api.TestCase, testSuiteResult *engine.Test
 		hookExecutor := newHookExecutor(r.Repositories, r.Debug, r.runCommand, r.renderTemplate)
 
 		result.PostTestHooksResults, err = hookExecutor.executeHooks(testCase.Hooks.PostTest, "post-test", testCase.Inputs, &result.Outputs, testSuiteResult.GetCompletedTests())
+		// Format hooks output once
+		result.ProcessHooksOutput()
+
 		if err != nil {
 			// Store hook error but continue execution
 			finalError = append(finalError, err.Error())

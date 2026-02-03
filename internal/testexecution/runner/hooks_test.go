@@ -404,8 +404,13 @@ func TestExecuteHooks_PreTestHooks_OutputsTemplateVariables(t *testing.T) {
 	hookExecutor := newHookExecutor(repositories, false, runCommand, renderTemplate)
 	results, err := hookExecutor.executeHooks(hooks, "pre-test", inputs, nil, map[string]*engine.TestCaseResult{})
 	require.Error(t, err)
-	assert.Nil(t, results)
-	assert.Contains(t, err.Error(), "failed to render hook template")
+	// Results should contain the HookResult for the template rendering failure
+	require.NotNil(t, results)
+	require.Len(t, results, 1)
+	assert.Equal(t, "pre-hook-with-outputs", results[0].Name)
+	require.Error(t, results[0].Error)
+	assert.Contains(t, results[0].Error.Error(), "failed to render hook template")
+	assert.Contains(t, err.Error(), "failed to render template")
 	assert.Contains(t, err.Error(), "nil pointer evaluating *engine.Outputs.XR")
 }
 

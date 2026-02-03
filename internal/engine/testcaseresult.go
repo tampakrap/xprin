@@ -45,6 +45,17 @@ type TestCaseResult struct {
 	RawRenderOutput   []byte
 	RawValidateOutput []byte
 
+	// Parsed render resources (parsed once, used many times)
+	RenderedResources []*unstructured.Unstructured
+
+	// Formatted outputs (formatted once, displayed many times)
+	FormattedRenderOutput           string
+	FormattedValidateOutput         string
+	FormattedPreTestHooksOutput     string
+	FormattedPostTestHooksOutput    string
+	FormattedAssertionsOutput       string // All assertions (for verbose display)
+	FormattedAssertionsFailedOutput string // Failed assertions only (for error messages)
+
 	PreTestHooksResults  []HookResult
 	PostTestHooksResults []HookResult
 
@@ -115,21 +126,25 @@ func (tcr *TestCaseResult) Complete() *TestCaseResult {
 // FailRender handles render failure with proper formatting.
 func (tcr *TestCaseResult) FailRender() *TestCaseResult {
 	tcr.hasFailedRender = true
-	return tcr.Fail(fmt.Errorf("%s", tcr.formatRenderOutput(tcr.RawRenderOutput)))
+	tcr.FormattedRenderOutput = strings.TrimSpace(string(tcr.RawRenderOutput))
+
+	return tcr.Fail(fmt.Errorf("%s", tcr.FormattedRenderOutput))
 }
 
 // MarkValidateFailed marks the test as having failed validation and returns the formatted error.
 // Callers should then call Fail() with this error to mark the test as failed.
 func (tcr *TestCaseResult) MarkValidateFailed() error {
 	tcr.hasFailedValidate = true
-	return fmt.Errorf("%s", tcr.formatValidateOutput(tcr.RawValidateOutput))
+	tcr.FormattedValidateOutput = tcr.formatValidateOutput(tcr.RawValidateOutput)
+
+	return fmt.Errorf("%s", tcr.FormattedValidateOutput)
 }
 
 // MarkAssertionsFailed marks the test as having failed assertions and returns the formatted error.
 // Callers should then call Fail() with this error to mark the test as failed.
 func (tcr *TestCaseResult) MarkAssertionsFailed() error {
 	tcr.hasFailedAssertions = true
-	return fmt.Errorf("%s", tcr.formatAssertionsOutput(tcr.AssertionsFailedResults, true))
+	return fmt.Errorf("%s", tcr.FormattedAssertionsFailedOutput)
 }
 
 // Print prints the test case result to the given writer.
@@ -147,24 +162,24 @@ func (tcr *TestCaseResult) Print(w io.Writer) {
 	// Print status line
 	fmt.Fprintf(w, "--- %s: %s (%.2fs)\n", tcr.Status, tcr.Name, tcr.Duration.Seconds()) //nolint:errcheck // output function, error handling not practical
 
-	if len(tcr.PreTestHooksResults) > 0 && tcr.Verbose && tcr.ShowHooks {
-		fmt.Fprintf(w, "%s\n", tcr.formatHooksOutput(tcr.PreTestHooksResults, "pre-test")) //nolint:errcheck // output function, error handling not practical
+	if tcr.FormattedPreTestHooksOutput != "" && tcr.Verbose && tcr.ShowHooks {
+		fmt.Fprintf(w, "%s\n", tcr.FormattedPreTestHooksOutput) //nolint:errcheck // output function, error handling not practical
 	}
 
-	if tcr.RawRenderOutput != nil && !tcr.hasFailedRender && tcr.Verbose && tcr.ShowRender {
-		fmt.Fprintf(w, "%s\n", tcr.formatRenderOutput(tcr.RawRenderOutput)) //nolint:errcheck // output function, error handling not practical
+	if tcr.FormattedRenderOutput != "" && !tcr.hasFailedRender && tcr.Verbose && tcr.ShowRender {
+		fmt.Fprintf(w, "%s\n", tcr.FormattedRenderOutput) //nolint:errcheck // output function, error handling not practical
 	}
 
-	if tcr.RawValidateOutput != nil && !tcr.hasFailedValidate && tcr.Verbose && tcr.ShowValidate {
-		fmt.Fprintf(w, "%s\n", tcr.formatValidateOutput(tcr.RawValidateOutput)) //nolint:errcheck // output function, error handling not practical
+	if tcr.FormattedValidateOutput != "" && !tcr.hasFailedValidate && tcr.Verbose && tcr.ShowValidate {
+		fmt.Fprintf(w, "%s\n", tcr.FormattedValidateOutput) //nolint:errcheck // output function, error handling not practical
 	}
 
-	if len(tcr.AssertionsAllResults) > 0 && tcr.Verbose && tcr.ShowAssertions {
-		fmt.Fprintf(w, "%s\n", tcr.formatAssertionsOutput(tcr.AssertionsAllResults, false)) //nolint:errcheck // output function, error handling not practical
+	if tcr.FormattedAssertionsOutput != "" && tcr.Verbose && tcr.ShowAssertions {
+		fmt.Fprintf(w, "%s\n", tcr.FormattedAssertionsOutput) //nolint:errcheck // output function, error handling not practical
 	}
 
-	if len(tcr.PostTestHooksResults) > 0 && tcr.Verbose && tcr.ShowHooks {
-		fmt.Fprintf(w, "%s\n", tcr.formatHooksOutput(tcr.PostTestHooksResults, "post-test")) //nolint:errcheck // output function, error handling not practical
+	if tcr.FormattedPostTestHooksOutput != "" && tcr.Verbose && tcr.ShowHooks {
+		fmt.Fprintf(w, "%s\n", tcr.FormattedPostTestHooksOutput) //nolint:errcheck // output function, error handling not practical
 	}
 
 	// Print error message for failed tests
@@ -178,24 +193,15 @@ func (tcr *TestCaseResult) Print(w io.Writer) {
 }
 
 // formatRenderOutput formats the rendered YAML raw output as a summary.
-func (tcr *TestCaseResult) formatRenderOutput(output []byte) string {
-	if tcr.hasFailedRender {
-		return strings.TrimSpace(string(tcr.RawRenderOutput))
-	}
-
-	resources, err := tcr.ParseRenderOutput(output)
-	if err != nil {
-		return fmt.Sprintf("%sError parsing YAML: %v", spaces, err)
-	}
-
+func (tcr *TestCaseResult) formatRenderOutput() string {
 	// Pre-allocate lines slice with capacity for all resources
-	lines := make([]string, 1, len(resources)+1)
+	lines := make([]string, 1, len(tcr.RenderedResources)+1)
 	lines[0] = fmt.Sprintf("%sRendered resources:", spaces)
 
 	// Loop over the resources and extract kind/name
-	for _, obj := range resources {
-		kind := obj.GetKind()
-		name := obj.GetName()
+	for _, resource := range tcr.RenderedResources {
+		kind := resource.GetKind()
+		name := resource.GetName()
 
 		// Add line with same prefix for all
 		lines = append(lines, fmt.Sprintf("%s├── %s/%s", spaces+spaces, kind, name))
@@ -204,9 +210,8 @@ func (tcr *TestCaseResult) formatRenderOutput(output []byte) string {
 	// Join lines and fix the last prefix
 	lastLineIndex := len(lines) - 1
 	lines[lastLineIndex] = strings.Replace(lines[lastLineIndex], "├──", "└──", 1)
-	result := strings.Join(lines, "\n")
 
-	return result
+	return strings.Join(lines, "\n")
 }
 
 // formatValidateOutput formats the validation raw output for display.
@@ -319,8 +324,8 @@ func (tcr *TestCaseResult) formatAssertionsOutput(assertionResults []AssertionRe
 	return strings.Join(lines, "\n")
 }
 
-// ParseRenderOutput parses the raw render output and returns the parsed resources.
-func (tcr *TestCaseResult) ParseRenderOutput(output []byte) ([]*unstructured.Unstructured, error) {
+// parseRenderOutput parses the raw render output and returns the resources.
+func (tcr *TestCaseResult) parseRenderOutput(output []byte) ([]*unstructured.Unstructured, error) {
 	decoder := k8syaml.NewYAMLToJSONDecoder(bytes.NewReader(output))
 
 	var resources []*unstructured.Unstructured
@@ -339,4 +344,51 @@ func (tcr *TestCaseResult) ParseRenderOutput(output []byte) ([]*unstructured.Uns
 	}
 
 	return resources, nil
+}
+
+// ProcessRenderOutput parses the raw render output and formats it.
+// It sets both RenderedResources and FormattedRenderOutput.
+func (tcr *TestCaseResult) ProcessRenderOutput(output []byte) error {
+	// Parse first and store in RenderedResources
+	resources, err := tcr.parseRenderOutput(output)
+	if err != nil {
+		return err
+	}
+
+	tcr.RenderedResources = resources
+
+	// Format using the already-parsed resources
+	tcr.FormattedRenderOutput = tcr.formatRenderOutput()
+
+	return nil
+}
+
+// ProcessValidateOutput formats the validation raw output.
+// It sets FormattedValidateOutput.
+func (tcr *TestCaseResult) ProcessValidateOutput(output []byte) {
+	tcr.FormattedValidateOutput = tcr.formatValidateOutput(output)
+}
+
+// ProcessHooksOutput formats the hooks results.
+// It sets FormattedPreTestHooksOutput and/or FormattedPostTestHooksOutput.
+func (tcr *TestCaseResult) ProcessHooksOutput() {
+	if len(tcr.PreTestHooksResults) > 0 {
+		tcr.FormattedPreTestHooksOutput = tcr.formatHooksOutput(tcr.PreTestHooksResults, "pre-test")
+	}
+
+	if len(tcr.PostTestHooksResults) > 0 {
+		tcr.FormattedPostTestHooksOutput = tcr.formatHooksOutput(tcr.PostTestHooksResults, "post-test")
+	}
+}
+
+// ProcessAssertionsOutput formats the assertion results.
+// It sets FormattedAssertionsOutput (all assertions) and FormattedAssertionsFailedOutput (failed only).
+func (tcr *TestCaseResult) ProcessAssertionsOutput() {
+	if len(tcr.AssertionsAllResults) > 0 {
+		tcr.FormattedAssertionsOutput = tcr.formatAssertionsOutput(tcr.AssertionsAllResults, false)
+	}
+
+	if len(tcr.AssertionsFailedResults) > 0 {
+		tcr.FormattedAssertionsFailedOutput = tcr.formatAssertionsOutput(tcr.AssertionsFailedResults, true)
+	}
 }
