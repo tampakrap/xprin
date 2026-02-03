@@ -1,0 +1,14 @@
+=== RUN   Initial reconciliation loop (using XR)
+--- PASS: Initial reconciliation loop (using XR) (X.XXXs)
+PASS
+ok	examples/mytests/1_simple_tests/example1_using-xr_xprin.yaml	X.XXXs
+=== RUN   Initial reconciliation loop (using Claim)
+--- PASS: Initial reconciliation loop (using Claim) (X.XXXs)
+PASS
+ok	examples/mytests/1_simple_tests/example2_using-claim_xprin.yaml	X.XXXs
+=== RUN   Initial reconciliation loop
+--- PASS: Initial reconciliation loop (X.XXXs)
+=== RUN   Second reconciliation loop
+--- PASS: Second reconciliation loop (X.XXXs)
+PASS
+ok	examples/mytests/2_multiple_testcases/example2_multiple-reconciliation-loops-using-common_xprin.yaml	X.XXXs

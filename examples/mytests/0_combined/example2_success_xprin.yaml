@@ -1,0 +1,39 @@
+tests:
+- name: "Successful test with hooks, validation, and assertions"
+  patches:
+    xrd: ../../aws/xrd-aws.yaml
+  inputs:
+    xr: ../../aws/xr.yaml
+    composition: ../../aws/composition.yaml
+    functions: ../../aws/functions.yaml
+    observed-resources: ../../aws/observed
+    crds:
+    - ../../aws/xrd-aws.yaml
+    - ../../aws/crossplane.yaml
+  hooks:
+    pre-test:
+    - name: "Pre-test hook"
+      run: echo "running pre-test hook"
+    post-test:
+    - name: "Post-test hook"
+      run: echo "running post-test hook"
+  assertions:
+    xprin:
+    - name: "Number of resources"
+      type: "Count"
+      value: 3
+    - name: "SecurityGroup should exist"
+      type: "Exists"
+      resource: "SecurityGroup/platform-aws-sg"
+    - name: "RDS should exist"
+      type: "Exists"
+      resource: "Cluster/platform-aws-rds"
+    - name: "SecurityGroup should have a name"
+      type: "FieldExists"
+      resource: "SecurityGroup/platform-aws-sg"
+      field: "metadata.name"
+    - name: "SecurityGroup description should be string"
+      type: "FieldType"
+      resource: "SecurityGroup/platform-aws-sg"
+      field: "spec.forProvider.description"
+      value: "string"

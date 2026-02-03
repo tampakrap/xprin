@@ -1,0 +1,26 @@
+=== RUN   Render failure (claim used as XR)
+--- FAIL: Render failure (claim used as XR) (X.XXXs)
+    crossplane: error: composition's compositeTypeRef.kind (XAWSInfrastructure) does not match XR's kind (AWSInfrastructure)
+=== RUN   Validation failure (v1 only) (missing required team)
+--- PASS: Validation failure (v1 only) (missing required team) (X.XXXs)
+=== RUN   Pre-test hook failure
+--- FAIL: Pre-test hook failure (X.XXXs)
+    pre-test hook 'Fail pre-test hook' failed: exit 1: : exit code 1
+=== RUN   Successful test case
+--- PASS: Successful test case (X.XXXs)
+=== RUN   Post-test hook failure
+--- FAIL: Post-test hook failure (X.XXXs)
+    post-test hook 'Fail post-test hook' failed: exit 1: : exit code 1
+=== RUN   Assertion failure
+--- FAIL: Assertion failure (X.XXXs)
+    1 assertion failed:
+        FAIL: Resource count should be zero - expected 0 resources, got 2
+=== RUN   Render failure (missing required inputs - multiline error)
+--- FAIL: Render failure (missing required inputs - multiline error) (X.XXXs)
+    missing mandatory field: either 'claim' or 'xr' must be specified (it can be specified either in the test case or in the common inputs)
+        missing mandatory field: composition (it can be specified either in the test case or in the common inputs)
+        missing mandatory field: functions (it can be specified either in the test case or in the common inputs)
+FAIL
+FAIL	examples/mytests/0_combined/example1_failures_xprin.yaml	X.XXXs
+FAIL
+YYYY/MM/DD HH:MM:SS processing completed with errors

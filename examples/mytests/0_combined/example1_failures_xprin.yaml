@@ -1,0 +1,54 @@
+tests:
+- name: "Render failure (claim used as XR)"
+  inputs:
+    xr: ../../aws/claim.yaml
+    composition: ../../aws/composition.yaml
+    functions: ../../aws/functions.yaml
+
+- name: "Validation failure (v1 only) (missing required team)"
+  inputs:
+    xr: ../../aws/xr_without_team.yaml
+    composition: ../../aws/composition.yaml
+    functions: ../../aws/functions.yaml
+    crds:
+    - ../../aws/xrd-aws.yaml
+    - ../../aws/crossplane.yaml
+
+- name: "Pre-test hook failure"
+  inputs:
+    xr: ../../aws/xr.yaml
+    composition: ../../aws/composition.yaml
+    functions: ../../aws/functions.yaml
+  hooks:
+    pre-test:
+    - name: "Fail pre-test hook"
+      run: exit 1
+
+- name: "Successful test case"
+  inputs:
+    xr: ../../aws/xr.yaml
+    composition: ../../aws/composition.yaml
+    functions: ../../aws/functions.yaml
+
+- name: "Post-test hook failure"
+  inputs:
+    xr: ../../aws/xr.yaml
+    composition: ../../aws/composition.yaml
+    functions: ../../aws/functions.yaml
+  hooks:
+    post-test:
+    - name: "Fail post-test hook"
+      run: exit 1
+
+- name: "Assertion failure"
+  inputs:
+    xr: ../../aws/xr.yaml
+    composition: ../../aws/composition.yaml
+    functions: ../../aws/functions.yaml
+  assertions:
+    xprin:
+    - name: "Resource count should be zero"
+      type: "Count"
+      value: 0
+
+- name: "Render failure (missing required inputs - multiline error)"

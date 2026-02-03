@@ -24,6 +24,19 @@ version: ## gets the version
 		GIT_COMMIT_SHORT_HASH=$$(git rev-parse --short HEAD); \
 	echo v0.0.0-$${GIT_COMMIT_TIMESTAMP}-$${GIT_COMMIT_SHORT_HASH}
 
+.PHONY: build ## builds xprin only
+build:
+	@XPRIN_VERSION=$$(make --no-print-directory version); \
+	CGO_ENABLED=0 go build -ldflags="-s -w -X=github.com/crossplane-contrib/xprin/internal/version.version=$$XPRIN_VERSION" ./cmd/xprin
+
+.PHONY: build-helpers ## builds xprin-helpers only
+build-helpers:
+	@XPRIN_VERSION=$$(make --no-print-directory version); \
+	CGO_ENABLED=0 go build -ldflags="-s -w -X=github.com/crossplane-contrib/xprin/internal/version.version=$$XPRIN_VERSION" ./cmd/xprin-helpers
+
+.PHONY: build-all ## builds xprin and xprin-helpers
+build-all: build build-helpers
+
 .PHONY: install
 install: ## installs xprin only
 	@XPRIN_VERSION=$$(make --no-print-directory version); \
@@ -42,6 +55,10 @@ lint: .bin/golangci-lint ## runs lint
 test: ## runs tests
 	go test ./...
 
+.PHONY: test-e2e
+test-e2e: build-all ## runs e2e tests
+	@bash tests/e2e/scripts/run.sh
+
 .PHONY: fmt
 fmt: .bin/gofumpt ## formats go and cue files
 	@./.bin/gofumpt -w .
@@ -53,4 +70,4 @@ install-tools: .bin/golangci-lint .bin/gofumpt ## installs tools
 	GOBIN="$$(pwd)/.bin" go install mvdan.cc/gofumpt@$(GOFUMPT_VERSION)
 
 .bin/golangci-lint:
-	GOBIN="$$(pwd)/.bin" go install  github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
+	GOBIN="$$(pwd)/.bin" go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
