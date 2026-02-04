@@ -55,9 +55,6 @@ else
         XP_MAJOR=2
     fi
 fi
-echo "Using Crossplane major version: v${XP_MAJOR} (expected files: testcase_<id>.output or testcase_<id>.v${XP_MAJOR}.output)"
-echo ""
-
 TEST_CASES=($(compgen -v | grep '^testcase_' | grep -v '_exit$' | sort))
 
 if [ "${#TEST_CASES[@]}" -eq 0 ]; then
@@ -84,6 +81,8 @@ for test_var in "${TEST_CASES[@]}"; do
     fi
 
     echo "Running testcase_${test_id}..."
+    read -ra cmd_args <<< "${test_args}"
+    echo "Command: xprin test ${cmd_args[*]}"
 
     TMPDIR="$(mktemp -d)"
     TMPDIRS+=("${TMPDIR}")
@@ -97,8 +96,6 @@ for test_var in "${TEST_CASES[@]}"; do
     fi
     ACTUAL_OUTPUT="${TMPDIR}/actual.output"
     NORMALIZED_OUTPUT="${TMPDIR}/normalized.output"
-
-    read -ra cmd_args <<< "${test_args}"
 
     set +e
     "${XPRIN_BIN}" test "${cmd_args[@]}" > "${ACTUAL_OUTPUT}" 2>&1
@@ -150,31 +147,29 @@ for test_var in "${TEST_CASES[@]}"; do
     echo ""
 done
 
+# Environment (debug info)
 echo ""
-echo "========================================="
-echo "E2E Test Results"
-echo "========================================="
-echo "Total:  $((PASSED + FAILED))"
-echo "Passed: ${PASSED}"
-echo "Failed: ${FAILED}"
+echo "--- Environment ---"
+echo "xprin binary:  ${XPRIN_BIN}"
+echo "xprin version: $("${XPRIN_BIN}" version)"
+echo "Crossplane:    $(crossplane version --client | cut -d':' -f2 | xargs)"
 echo ""
+
+# E2E results
+echo "--- E2E results ---"
+echo "Total:  $((PASSED + FAILED))  Passed: ${PASSED}  Failed: ${FAILED}"
 
 if [ ${FAILED} -gt 0 ]; then
     echo "Failed tests:"
     for test in "${FAILED_TESTS[@]}"; do
         echo "  - ${test}"
     done
-    echo ""
     STATUS=1
 fi
 
-echo "Toolset versions:"
-echo "- Crossplane: $(crossplane version --client | cut -d':' -f2 | xargs)"
-echo "- xprin: $("${XPRIN_BIN}" version)"
-
+echo ""
 if [ ${STATUS} -eq 0 ]; then
-    echo ""
-    echo "All tests passed!"
+    echo "All tests passed."
 fi
 
 exit ${STATUS}
