@@ -14,7 +14,34 @@
 --- FAIL: Pre-test hook failure (X.XXXs)
     pre-test hooks results:
         - Fail pre-test hook
-    pre-test hook 'Fail pre-test hook' failed: exit 1: : exit code 1
+    pre-test hook 'Fail pre-test hook' failed with exit code 1
+=== RUN   Pre-test hook failure (unnamed)
+--- FAIL: Pre-test hook failure (unnamed) (X.XXXs)
+    pre-test hooks results:
+        - exit 1
+    pre-test hook failed with exit code 1: exit 1
+=== RUN   Pre-test hook failure (multiline stderr)
+--- FAIL: Pre-test hook failure (multiline stderr) (X.XXXs)
+    pre-test hooks results:
+        - Fail pre-test hook (multiline stderr)
+    pre-test hook 'Fail pre-test hook (multiline stderr)' failed with exit code 1: first line
+    second line
+    third line
+=== RUN   Pre-test hook failure (multiline stdout)
+--- FAIL: Pre-test hook failure (multiline stdout) (X.XXXs)
+    pre-test hooks results:
+        - Fail pre-test hook (multiline stdout)
+            stdout line 1
+            stdout line 2
+    pre-test hook 'Fail pre-test hook (multiline stdout)' failed with exit code 1
+=== RUN   Pre-test hook failure (multiline stdout and stderr)
+--- FAIL: Pre-test hook failure (multiline stdout and stderr) (X.XXXs)
+    pre-test hooks results:
+        - Fail pre-test hook (multiline stdout and stderr)
+            stdout A
+            stdout B
+    pre-test hook 'Fail pre-test hook (multiline stdout and stderr)' failed with exit code 1: stderr 1
+    stderr 2
 === RUN   Successful test case
 --- PASS: Successful test case (X.XXXs)
     Rendered resources:
@@ -27,7 +54,7 @@
         └── SecurityGroup/platform-aws-sg
     post-test hooks results:
         - Fail post-test hook
-    post-test hook 'Fail post-test hook' failed: exit 1: : exit code 1
+    post-test hook 'Fail post-test hook' failed with exit code 1
 === RUN   Assertion failure
 --- FAIL: Assertion failure (X.XXXs)
     Rendered resources:

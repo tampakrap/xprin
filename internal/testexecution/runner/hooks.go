@@ -52,6 +52,8 @@ func newHookExecutor(
 }
 
 // executeHooks executes a list of hook commands and returns the combined output.
+//
+//nolint:gocognit // TODO: split into helpers in a follow-up (with assertions for consistency)
 func (e *hookExecutor) executeHooks(hooks []api.Hook, hookType string, inputs api.Inputs, outputs *engine.Outputs, tests map[string]*engine.TestCaseResult) ([]engine.HookResult, error) {
 	hookResults := make([]engine.HookResult, 0, len(hooks))
 
@@ -101,27 +103,32 @@ func (e *hookExecutor) executeHooks(hooks []api.Hook, hookType string, inputs ap
 		hookResults = append(hookResults, hookResult)
 
 		if err != nil {
-			// Create error message with command, stderr, and exit code
-			var errorMsg string
-
 			stderrStr := strings.TrimSpace(string(stderr))
 			// Indent multiline stderr output for better readability
 			if strings.Contains(stderrStr, "\n") {
 				stderrStr = strings.ReplaceAll(stderrStr, "\n", "\n    ")
 			}
 
-			// Get exit code from error
-			exitCode := 1 // default
+			exitCode := 1
 
-			exitError := &exec.ExitError{}
+			var exitError *exec.ExitError
 			if errors.As(err, &exitError) {
 				exitCode = exitError.ExitCode()
 			}
 
+			var errorMsg string
 			if hook.Name != "" {
-				errorMsg = fmt.Sprintf("%s hook '%s' failed: %s: %s: exit code %d", hookType, hook.Name, hook.Run, stderrStr, exitCode)
+				errorMsg = fmt.Sprintf("%s hook '%s' failed with exit code %d", hookType, hook.Name, exitCode)
+				if stderrStr != "" {
+					errorMsg = fmt.Sprintf("%s: %s", errorMsg, stderrStr)
+				}
 			} else {
-				errorMsg = fmt.Sprintf("%s hook failed: %s: %s: exit code %d", hookType, hook.Run, stderrStr, exitCode)
+				errorMsg = fmt.Sprintf("%s hook failed with exit code %d", hookType, exitCode)
+				if stderrStr != "" {
+					errorMsg = fmt.Sprintf("%s: %s", errorMsg, stderrStr)
+				} else {
+					errorMsg = fmt.Sprintf("%s: %s", errorMsg, hook.Run)
+				}
 			}
 
 			return hookResults, errors.New(errorMsg)

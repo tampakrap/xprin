@@ -5,9 +5,20 @@
         [x] schema validation error aws.example.com/v1, Kind=XAWSInfrastructure, platform-aws : spec.team: Required value
         Total 2 resources: 0 missing schemas, 1 success cases, 1 failure cases
 --- FAIL: Pre-test hook failure (X.XXXs)
-    pre-test hook 'Fail pre-test hook' failed: exit 1: : exit code 1
+    pre-test hook 'Fail pre-test hook' failed with exit code 1
+--- FAIL: Pre-test hook failure (unnamed) (X.XXXs)
+    pre-test hook failed with exit code 1: exit 1
+--- FAIL: Pre-test hook failure (multiline stderr) (X.XXXs)
+    pre-test hook 'Fail pre-test hook (multiline stderr)' failed with exit code 1: first line
+    second line
+    third line
+--- FAIL: Pre-test hook failure (multiline stdout) (X.XXXs)
+    pre-test hook 'Fail pre-test hook (multiline stdout)' failed with exit code 1
+--- FAIL: Pre-test hook failure (multiline stdout and stderr) (X.XXXs)
+    pre-test hook 'Fail pre-test hook (multiline stdout and stderr)' failed with exit code 1: stderr 1
+    stderr 2
 --- FAIL: Post-test hook failure (X.XXXs)
-    post-test hook 'Fail post-test hook' failed: exit 1: : exit code 1
+    post-test hook 'Fail post-test hook' failed with exit code 1
 --- FAIL: Assertion failure (X.XXXs)
     1 assertion failed:
         FAIL: Resource count should be zero - expected 0 resources, got 2

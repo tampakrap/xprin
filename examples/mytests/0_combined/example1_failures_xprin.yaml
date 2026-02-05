@@ -24,6 +24,57 @@ tests:
     - name: "Fail pre-test hook"
       run: exit 1
 
+- name: "Pre-test hook failure (unnamed)"
+  inputs:
+    xr: ../../aws/xr.yaml
+    composition: ../../aws/composition.yaml
+    functions: ../../aws/functions.yaml
+  hooks:
+    pre-test:
+    - run: exit 1
+
+- name: "Pre-test hook failure (multiline stderr)"
+  inputs:
+    xr: ../../aws/xr.yaml
+    composition: ../../aws/composition.yaml
+    functions: ../../aws/functions.yaml
+  hooks:
+    pre-test:
+    - name: "Fail pre-test hook (multiline stderr)"
+      run: |
+        echo "first line" >&2
+        echo "second line" >&2
+        echo "third line" >&2
+        exit 1
+
+- name: "Pre-test hook failure (multiline stdout)"
+  inputs:
+    xr: ../../aws/xr.yaml
+    composition: ../../aws/composition.yaml
+    functions: ../../aws/functions.yaml
+  hooks:
+    pre-test:
+    - name: "Fail pre-test hook (multiline stdout)"
+      run: |
+        echo "stdout line 1"
+        echo "stdout line 2"
+        exit 1
+
+- name: "Pre-test hook failure (multiline stdout and stderr)"
+  inputs:
+    xr: ../../aws/xr.yaml
+    composition: ../../aws/composition.yaml
+    functions: ../../aws/functions.yaml
+  hooks:
+    pre-test:
+    - name: "Fail pre-test hook (multiline stdout and stderr)"
+      run: |
+        echo "stdout A"
+        echo "stdout B"
+        echo "stderr 1" >&2
+        echo "stderr 2" >&2
+        exit 1
+
 - name: "Successful test case"
   inputs:
     xr: ../../aws/xr.yaml

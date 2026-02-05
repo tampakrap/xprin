@@ -150,7 +150,7 @@ func TestExecuteHooks_HookFailure(t *testing.T) {
 		require.Error(t, err)
 
 		// Validate complete error message format
-		expectedError := "test hook 'failing-hook' failed: exit 1: command failed: exit code 1"
+		expectedError := "test hook 'failing-hook' failed with exit code 1: command failed"
 		assert.Equal(t, expectedError, err.Error())
 	})
 
@@ -175,10 +175,8 @@ func TestExecuteHooks_HookFailure(t *testing.T) {
 		require.Error(t, err)
 
 		// Validate error message format (should contain the key components)
-		assert.Contains(t, err.Error(), "pre-test hook failed")
-		assert.Contains(t, err.Error(), "exit 2")
+		assert.Contains(t, err.Error(), "pre-test hook failed with exit code")
 		assert.Contains(t, err.Error(), "another error")
-		assert.Contains(t, err.Error(), "exit code")
 	})
 
 	t.Run("hook with multiline stderr", func(t *testing.T) {
@@ -202,10 +200,8 @@ func TestExecuteHooks_HookFailure(t *testing.T) {
 		require.Error(t, err)
 
 		// Validate that multiline stderr is properly indented and contains key components
-		assert.Contains(t, err.Error(), "post-test hook 'multiline-hook' failed")
-		assert.Contains(t, err.Error(), "echo 'line1' && echo 'line2' && exit 3")
+		assert.Contains(t, err.Error(), "post-test hook 'multiline-hook' failed with exit code")
 		assert.Contains(t, err.Error(), "line1\n    line2\n    final error")
-		assert.Contains(t, err.Error(), "exit code")
 	})
 }
 

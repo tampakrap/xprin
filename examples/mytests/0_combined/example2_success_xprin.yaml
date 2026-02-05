@@ -14,9 +14,21 @@ tests:
     pre-test:
     - name: "Pre-test hook"
       run: echo "running pre-test hook"
+    - name: "Pre-test hook (multiline stdout)"
+      run: |
+        echo "line one"
+        echo "line two"
+        echo "line three"
+    - run: echo "unnamed pre-test hook"
     post-test:
     - name: "Post-test hook"
       run: echo "running post-test hook"
+    - name: "Post-test hook (multiline stdout)"
+      run: |
+        echo "output A"
+        echo "output B"
+        echo "output C"
+    - run: echo "unnamed post-test hook"
   assertions:
     xprin:
     - name: "Number of resources"

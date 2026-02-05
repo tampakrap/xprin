@@ -3,6 +3,12 @@
     pre-test hooks results:
         - Pre-test hook
             running pre-test hook
+        - Pre-test hook (multiline stdout)
+            line one
+            line two
+            line three
+        - echo "unnamed pre-test hook"
+            unnamed pre-test hook
     Rendered resources:
         ├── XAWSInfrastructure/platform-aws
         ├── Cluster/platform-aws-rds
@@ -21,5 +27,11 @@
     post-test hooks results:
         - Post-test hook
             running post-test hook
+        - Post-test hook (multiline stdout)
+            output A
+            output B
+            output C
+        - echo "unnamed post-test hook"
+            unnamed post-test hook
 PASS
 ok	examples/mytests/0_combined/example2_success_xprin.yaml	X.XXXs
