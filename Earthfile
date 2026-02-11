@@ -4,6 +4,8 @@ VERSION --try --raw-output 0.8
 PROJECT crossplane-contrib/xprin
 
 ARG --global GO_VERSION=1.24.7
+ARG --global E2E_CROSSPLANE_V1=v1.20.4
+ARG --global E2E_CROSSPLANE_V2=v2.1.3
 
 # reviewable checks that a branch is ready for review. Run it before opening a
 # pull request. It will catch a lot of the things our CI workflow will catch.
@@ -157,13 +159,32 @@ test-e2e:
 
 # test-e2e-v1 runs tests against Crossplane v1.
 test-e2e-v1:
-  BUILD --build-arg CROSSPLANE_VERSION=v1.20.4 +test-e2e
+  BUILD --build-arg CROSSPLANE_VERSION=$E2E_CROSSPLANE_V1 +test-e2e
 
 # test-e2e-v2 runs tests against Crossplane v2.
 test-e2e-v2:
-  BUILD --build-arg CROSSPLANE_VERSION=v2.1.3 +test-e2e
+  BUILD --build-arg CROSSPLANE_VERSION=$E2E_CROSSPLANE_V2 +test-e2e
 
 # test-e2e-all runs the e2e tests against v1 and v2 (sequential; for local use; CI uses matrix jobs).
 test-e2e-all:
   BUILD +test-e2e-v1
   BUILD +test-e2e-v2
+
+# regen-e2e-expected regenerates tests/e2e/expected/*.output for both Crossplane v1 and v2 in one run.
+regen-e2e-expected:
+  ARG TARGETARCH
+  ARG TARGETOS
+  ARG GOARCH=${TARGETARCH}
+  ARG GOOS=${TARGETOS}
+  FROM earthly/dind:alpine-3.20-docker-26.1.5-r0
+  RUN mkdir -p /opt/crossplane/v1/bin /opt/crossplane/v2/bin
+  COPY (+crossplane-cli/crossplane --CROSSPLANE_VERSION=${E2E_CROSSPLANE_V1}) /opt/crossplane/v1/bin/crossplane
+  COPY (+crossplane-cli/crossplane --CROSSPLANE_VERSION=${E2E_CROSSPLANE_V2}) /opt/crossplane/v2/bin/crossplane
+  RUN apk add --no-cache bash
+  COPY +go-build/xprin .
+  COPY --dir examples/ tests/ ./
+  RUN chmod +x tests/e2e/scripts/run.sh tests/e2e/scripts/regen-expected.sh
+  WITH DOCKER
+    RUN CROSSPLANE_V1=/opt/crossplane/v1/bin/crossplane CROSSPLANE_V2=/opt/crossplane/v2/bin/crossplane /tests/e2e/scripts/regen-expected.sh
+  END
+  SAVE ARTIFACT tests/e2e/expected AS LOCAL tests/e2e/expected
