@@ -507,3 +507,73 @@ func TestExecuteHooks_WorkingDirectory(t *testing.T) {
 	require.NoError(t, results[0].Error, "hook should execute successfully")
 	assert.Equal(t, testSuiteDir, capturedDir, "runCommand should set cmd.Dir to testsuite file directory")
 }
+
+// TestProcessHookTemplateVariables tests the processHookTemplateVariables helper.
+func TestProcessHookTemplateVariables(t *testing.T) {
+	renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+		return content, nil
+	}
+	exec := newHookExecutor(nil, false, nil, renderTemplate)
+
+	t.Run("no placeholders returns command as-is", func(t *testing.T) {
+		hook := api.Hook{Name: "h", Run: "echo hello"}
+		final, cmdVars, err := exec.processHookTemplateVariables(hook, api.Inputs{}, nil, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "echo hello", final)
+		assert.Equal(t, "echo hello", cmdVars)
+	})
+
+	t.Run("with placeholders restores and calls renderTemplate", func(t *testing.T) {
+		var rendered string
+
+		renderTemplate := func(content string, _ *templateContext, _ string) (string, error) {
+			rendered = content
+			return "echo /path", nil
+		}
+		exec := newHookExecutor(map[string]string{"r": "/path"}, false, nil, renderTemplate)
+		hook := api.Hook{Run: testexecutionUtils.CreatePlaceholder(".Repositories.r")}
+		final, cmdVars, err := exec.processHookTemplateVariables(hook, api.Inputs{}, nil, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "echo /path", final)
+		assert.Equal(t, "{{.Repositories.r}}", cmdVars)
+		assert.Equal(t, "{{.Repositories.r}}", rendered)
+	})
+
+	t.Run("render error is returned", func(t *testing.T) {
+		renderTemplate := func(string, *templateContext, string) (string, error) {
+			return "", fmt.Errorf("render failed")
+		}
+		exec := newHookExecutor(nil, false, nil, renderTemplate)
+		hook := api.Hook{Run: testexecutionUtils.CreatePlaceholder(".X")}
+		_, _, err := exec.processHookTemplateVariables(hook, api.Inputs{}, nil, nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "render failed")
+	})
+}
+
+// TestBuildHookFailureMessage tests the buildHookFailureMessage helper.
+func TestBuildHookFailureMessage(t *testing.T) {
+	t.Run("named hook with output", func(t *testing.T) {
+		msg := buildHookFailureMessage("pre-test", "my-hook", "echo x", 1, []byte("stderr line"))
+		assert.Contains(t, msg, "pre-test hook 'my-hook' failed with exit code 1")
+		assert.Contains(t, msg, "stderr line")
+	})
+	t.Run("named hook without output", func(t *testing.T) {
+		msg := buildHookFailureMessage("post-test", "h", "cmd", 2, nil)
+		assert.Equal(t, "post-test hook 'h' failed with exit code 2", msg)
+	})
+	t.Run("unnamed hook with output", func(t *testing.T) {
+		msg := buildHookFailureMessage("pre-test", "", "echo bar", 1, []byte("err"))
+		assert.Contains(t, msg, "pre-test hook failed with exit code 1")
+		assert.Contains(t, msg, "err")
+	})
+	t.Run("unnamed hook without output includes command", func(t *testing.T) {
+		msg := buildHookFailureMessage("post-test", "", "echo baz", 3, nil)
+		assert.Contains(t, msg, "post-test hook failed with exit code 3")
+		assert.Contains(t, msg, "echo baz")
+	})
+	t.Run("multiline output is indented", func(t *testing.T) {
+		msg := buildHookFailureMessage("pre-test", "h", "c", 1, []byte("line1\nline2"))
+		assert.Contains(t, msg, "line1\n    line2")
+	})
+}
