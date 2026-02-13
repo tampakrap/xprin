@@ -16,12 +16,25 @@ limitations under the License.
 
 package engine
 
-// Status represents the status of a test case or assertion.
-type Status string
+// Status represents the status of a test case or job step (assertion, hook, etc.), including how to display it.
+type Status struct {
+	Value  string // Canonical value (PASS, FAIL, SKIP, ERROR) for comparison, serialization, and display.
+	Symbol string // Display symbol (aligned with crossplane beta validate semantics).
+}
 
-// Status constants for test cases and assertions.
-const (
-	StatusPass Status = "PASS"
-	StatusFail Status = "FAIL"
-	StatusSkip Status = "SKIP"
-)
+// String implements fmt.Stringer so status prints as its canonical value.
+func (s Status) String() string {
+	return s.Value
+}
+
+// StatusPass returns the status for a passed test case or job step.
+func StatusPass() Status { return Status{Value: "PASS", Symbol: "[✓]"} }
+
+// StatusFail returns the status for a failed test case or job step.
+func StatusFail() Status { return Status{Value: "FAIL", Symbol: "[x]"} }
+
+// StatusSkip returns the status for a skipped test case or job step.
+func StatusSkip() Status { return Status{Value: "SKIP", Symbol: "[s]"} }
+
+// StatusError returns the status when a test case or job step could not run.
+func StatusError() Status { return Status{Value: "ERROR", Symbol: "[!]"} }

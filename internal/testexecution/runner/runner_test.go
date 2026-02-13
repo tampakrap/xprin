@@ -1238,9 +1238,10 @@ func TestRunTestCase(t *testing.T) {
 					if name == config.CrossplaneCmd && len(args) > 1 && args[0] == config.ValidateSubcommand {
 						return []byte("validate ok"), nil
 					}
-					// Mock failing hook execution
+					// Mock failing hook execution (use real *exec.ExitError so output shows [x])
 					if name == "sh" && len(args) > 0 && args[0] == "-c" {
-						return []byte("failing setup\nhook failed"), errors.New("exit status 1")
+						err := exec.Command("sh", "-c", "exit 1").Run()
+						return []byte("failing setup\nhook failed"), err
 					}
 
 					return []byte{}, nil
@@ -1273,9 +1274,10 @@ func TestRunTestCase(t *testing.T) {
 					if name == config.CrossplaneCmd && len(args) > 1 && args[0] == config.ValidateSubcommand {
 						return []byte("validate ok"), nil
 					}
-					// Mock failing hook execution
+					// Mock failing hook execution (use real *exec.ExitError so output shows [x])
 					if name == "sh" && len(args) > 0 && args[0] == "-c" {
-						return []byte("failing cleanup\nhook failed"), errors.New("exit status 1")
+						err := exec.Command("sh", "-c", "exit 1").Run()
+						return []byte("failing cleanup\nhook failed"), err
 					}
 
 					return []byte{}, nil
@@ -1301,11 +1303,11 @@ func TestRunTestCase(t *testing.T) {
 			result := testRunner.runTestCase(tc.testCase, testSuiteResult)
 
 			if tc.wantError != "" {
-				assert.Equal(t, engine.StatusFail, result.Status)
+				assert.Equal(t, engine.StatusFail(), result.Status)
 				require.Error(t, result.Error)
 				assert.Contains(t, result.Error.Error(), tc.wantError)
-			} else if result.Status != engine.StatusFail || result.Error != nil {
-				assert.Equal(t, engine.StatusPass, result.Status)
+			} else if result.Status != engine.StatusFail() || result.Error != nil {
+				assert.Equal(t, engine.StatusPass(), result.Status)
 				require.NoError(t, result.Error)
 			}
 			// else: pipeline failure only (StatusFail, Error == nil); failure is shown in sections
@@ -1358,7 +1360,7 @@ func TestRunTestCase(t *testing.T) {
 				var buf bytes.Buffer
 				result.Print(&buf)
 				assert.Contains(t, buf.String(), "Post-test Hooks:")
-				assert.Contains(t, buf.String(), "[x] templated-cleanup")
+				assert.Contains(t, buf.String(), "[!] templated-cleanup")
 				assert.Contains(t, buf.String(), "error: failed to render hook template")
 				assert.Contains(t, buf.String(), "can't evaluate field UnknownField")
 				assert.NotContains(t, buf.String(), "exit code")
@@ -1829,11 +1831,11 @@ func TestRunTestCase_CommonPathExpansionAndVerification(t *testing.T) {
 			result := testRunner.runTestCase(tc.testCase, testSuiteResult)
 
 			if tc.wantError != "" {
-				assert.Equal(t, engine.StatusFail, result.Status)
+				assert.Equal(t, engine.StatusFail(), result.Status)
 				require.Error(t, result.Error)
 				assert.Contains(t, result.Error.Error(), tc.wantError)
 			} else {
-				assert.Equal(t, engine.StatusPass, result.Status)
+				assert.Equal(t, engine.StatusPass(), result.Status)
 				assert.NoError(t, result.Error)
 			}
 		})
@@ -2320,11 +2322,11 @@ func TestRunTestCase_LocalPathExpansionAndVerification(t *testing.T) {
 			result := testRunner.runTestCase(tc.testCase, testSuiteResult)
 
 			if tc.wantError != "" {
-				assert.Equal(t, engine.StatusFail, result.Status)
+				assert.Equal(t, engine.StatusFail(), result.Status)
 				require.Error(t, result.Error)
 				assert.Contains(t, result.Error.Error(), tc.wantError)
 			} else {
-				assert.Equal(t, engine.StatusPass, result.Status)
+				assert.Equal(t, engine.StatusPass(), result.Status)
 				assert.NoError(t, result.Error)
 			}
 		})
@@ -2688,11 +2690,11 @@ func TestRunTestCase_MergeCommon(t *testing.T) {
 			result := testRunner.runTestCase(tc.testCase, testSuiteResult)
 
 			if tc.wantError != "" {
-				assert.Equal(t, engine.StatusFail, result.Status)
+				assert.Equal(t, engine.StatusFail(), result.Status)
 				require.Error(t, result.Error)
 				assert.Contains(t, result.Error.Error(), tc.wantError)
 			} else {
-				assert.Equal(t, engine.StatusPass, result.Status)
+				assert.Equal(t, engine.StatusPass(), result.Status)
 				assert.NoError(t, result.Error)
 			}
 		})
@@ -2735,7 +2737,7 @@ func TestRunTestCase_UsesTestResultWithStartTime(t *testing.T) {
 	}
 	testSuiteResult := engine.NewTestSuiteResult("test-suite.yaml", false)
 	result := runner.runTestCase(testCase, testSuiteResult)
-	assert.Equal(t, engine.StatusPass, result.Status)
+	assert.Equal(t, engine.StatusPass(), result.Status)
 	require.NoError(t, result.Error)
 	assert.False(t, result.StartTime.IsZero(), "TestCaseResult should have StartTime set")
 }
@@ -2789,7 +2791,7 @@ func TestRunTestCase_SkipsValidateWhenNoCRDs(t *testing.T) {
 
 	testSuiteResult := engine.NewTestSuiteResult("test-suite.yaml", false)
 	result := runner.runTestCase(testCase, testSuiteResult)
-	assert.Equal(t, engine.StatusPass, result.Status)
+	assert.Equal(t, engine.StatusPass(), result.Status)
 	assert.NoError(t, result.Error)
 }
 
@@ -3401,7 +3403,7 @@ metadata:
 	// Call runapi.TestCase WITHOUT runTestCaseFunc - this executes the REAL code path
 	result := runner.runTestCase(testCase, testSuiteResult)
 	require.NoError(t, result.Error)
-	assert.Equal(t, engine.StatusPass, result.Status)
+	assert.Equal(t, engine.StatusPass(), result.Status)
 
 	// Verify Outputs paths are set (indicating files were written to outputs directory)
 	// Note: The actual files are cleaned up by defer in runapi.TestCase, but the paths prove they were written
@@ -3613,7 +3615,7 @@ metadata:
 		// Call runTestCase WITHOUT runTestCaseFunc - this executes the REAL code path
 		result := runner.runTestCase(testCase, testSuiteResult)
 		require.NoError(t, result.Error)
-		assert.Equal(t, engine.StatusPass, result.Status)
+		assert.Equal(t, engine.StatusPass(), result.Status)
 
 		// Verify files were actually copied to artifacts directory by the REAL code
 		artifactsDir := filepath.Join(artifactsBaseDir, testCase.ID)

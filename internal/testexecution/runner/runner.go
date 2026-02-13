@@ -718,7 +718,7 @@ func (r *Runner) runTestCase(testCase api.TestCase, testSuiteResult *engine.Test
 
 	// Complete the test case result
 	if r.Debug {
-		utils.DebugPrintf("Test case '%s' completed with status: %s\n", testCase.Name, string(result.Status))
+		utils.DebugPrintf("Test case '%s' completed with status: %s\n", testCase.Name, result.Status.String())
 	}
 
 	return result.Complete()

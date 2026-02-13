@@ -12,6 +12,7 @@ Assertions are executed after Crossplane validation (if CRDs are provided) or af
 - Support for common and test-level assertions
 - All assertions evaluated even if some fail
 - Detailed error messages for debugging
+- Each assertion is reported with a symbol: **[✓]** passed, **[x]** failed, **[!]** error (could not evaluate). The summary line shows totals (e.g. “3 assertions, 1 successful, 2 failed, 0 errors”). See [Statuses and output symbols](how-it-works.md#statuses-and-output-symbols).
 
 For information about how assertions work internally, see [How It Works](how-it-works.md#assertions-execution).
 

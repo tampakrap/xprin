@@ -30,7 +30,7 @@ type TestSuiteResult struct {
 	FilePath  string
 	Results   []TestCaseResult
 	Duration  time.Duration
-	Status    Status // StatusPass or StatusFail - overall status
+	Status    Status // StatusPass() or StatusFail() - overall status
 	StartTime time.Time
 	Verbose   bool // Formatting flag for output
 }
@@ -39,7 +39,7 @@ type TestSuiteResult struct {
 func NewTestSuiteResult(filePath string, verbose bool) *TestSuiteResult {
 	return &TestSuiteResult{
 		FilePath:  filePath,
-		Status:    StatusPass, // Default to pass
+		Status:    StatusPass(), // Default to pass
 		StartTime: time.Now(),
 		Verbose:   verbose,
 	}
@@ -50,8 +50,8 @@ func (tsr *TestSuiteResult) AddResult(result *TestCaseResult) {
 	tsr.Results = append(tsr.Results, *result)
 
 	// Update overall status if any test failed
-	if result.Status == StatusFail {
-		tsr.Status = StatusFail
+	if result.Status == StatusFail() {
+		tsr.Status = StatusFail()
 	}
 }
 
@@ -71,11 +71,11 @@ func (tsr *TestSuiteResult) Print(w io.Writer) {
 		}
 	}
 
-	if tsr.Status == StatusFail {
-		fmt.Fprintf(w, "%s\n%s\t%s\t%.3fs\n", string(StatusFail), string(StatusFail), displayPath, tsr.Duration.Seconds()) //nolint:errcheck // output function, error handling not practical
+	if tsr.Status == StatusFail() {
+		fmt.Fprintf(w, "%s\n%s\t%s\t%.3fs\n", StatusFail().Value, StatusFail().Value, displayPath, tsr.Duration.Seconds()) //nolint:errcheck // output function, error handling not practical
 	} else {
 		if tsr.Verbose {
-			fmt.Fprintln(w, string(StatusPass)) //nolint:errcheck // output function, error handling not practical
+			fmt.Fprintln(w, StatusPass().Value) //nolint:errcheck // output function, error handling not practical
 		}
 
 		fmt.Fprintf(w, "ok\t%s\t%.3fs\n", displayPath, tsr.Duration.Seconds()) //nolint:errcheck // output function, error handling not practical
@@ -84,7 +84,7 @@ func (tsr *TestSuiteResult) Print(w io.Writer) {
 
 // HasFailures returns true if any test failed.
 func (tsr *TestSuiteResult) HasFailures() bool {
-	return tsr.Status == StatusFail
+	return tsr.Status == StatusFail()
 }
 
 // GetCompletedTests returns a map of test ID to test case result for completed tests.

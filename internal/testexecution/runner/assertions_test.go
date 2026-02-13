@@ -34,7 +34,7 @@ const (
 func filterFailedAssertions(results []engine.AssertionResult) []engine.AssertionResult {
 	var failed []engine.AssertionResult
 	for _, r := range results {
-		if r.Status == engine.StatusFail {
+		if r.Status == engine.StatusFail() {
 			failed = append(failed, r)
 		}
 	}
@@ -118,8 +118,8 @@ metadata:
 
 		allResults := executor.executeAssertions(assertions)
 		assert.Len(t, allResults, 2)
-		assert.Equal(t, engine.StatusFail, allResults[0].Status)
-		assert.Equal(t, engine.StatusPass, allResults[1].Status)
+		assert.Equal(t, engine.StatusFail(), allResults[0].Status)
+		assert.Equal(t, engine.StatusPass(), allResults[1].Status)
 		failed := filterFailedAssertions(allResults)
 		assert.Len(t, failed, 1)
 		assert.Equal(t, "count-wrong", failed[0].Name)
@@ -138,11 +138,10 @@ metadata:
 
 		allResults := executor.executeAssertions(assertions)
 		assert.Len(t, allResults, 1)
-		assert.Equal(t, engine.StatusFail, allResults[0].Status)
+		assert.Equal(t, engine.StatusError(), allResults[0].Status, "invalid/unsupported assertion type is reported as error")
 		assert.Contains(t, allResults[0].Message, "unsupported assertion type")
 		failed := filterFailedAssertions(allResults)
-		assert.Len(t, failed, 1)
-		assert.Equal(t, "invalid-type", failed[0].Name)
+		assert.Empty(t, failed, "error assertions are not counted as failed")
 	})
 
 	t.Run("handles empty assertions list", func(t *testing.T) {
@@ -182,7 +181,7 @@ func TestAssertionExecutor_executeCountAssertion(t *testing.T) {
 		result, err := executor.executeCountAssertion(assertion)
 
 		require.NoError(t, err)
-		assert.Equal(t, engine.StatusPass, result.Status)
+		assert.Equal(t, engine.StatusPass(), result.Status)
 		assert.Contains(t, result.Message, "found 2 resources")
 	})
 
@@ -204,7 +203,7 @@ func TestAssertionExecutor_executeCountAssertion(t *testing.T) {
 		result, err := executor.executeCountAssertion(assertion)
 
 		require.NoError(t, err)
-		assert.Equal(t, engine.StatusFail, result.Status)
+		assert.Equal(t, engine.StatusFail(), result.Status)
 		assert.Contains(t, result.Message, "expected 5 resources, got 1")
 	})
 
@@ -226,7 +225,7 @@ func TestAssertionExecutor_executeCountAssertion(t *testing.T) {
 		result, err := executor.executeCountAssertion(assertion)
 
 		require.NoError(t, err)
-		assert.Equal(t, engine.StatusPass, result.Status)
+		assert.Equal(t, engine.StatusPass(), result.Status)
 	})
 
 	t.Run("fails with invalid value type", func(t *testing.T) {
@@ -240,7 +239,7 @@ func TestAssertionExecutor_executeCountAssertion(t *testing.T) {
 		result, err := executor.executeCountAssertion(assertion)
 
 		require.NoError(t, err)
-		assert.Equal(t, engine.StatusFail, result.Status)
+		assert.Equal(t, engine.StatusError(), result.Status)
 		assert.Contains(t, result.Message, "count assertion value must be a number")
 	})
 }
@@ -269,7 +268,7 @@ metadata:
 		result, err := executor.executeExistsAssertion(assertion)
 
 		require.NoError(t, err)
-		assert.Equal(t, engine.StatusPass, result.Status)
+		assert.Equal(t, engine.StatusPass(), result.Status)
 		assert.Contains(t, result.Message, "found")
 	})
 
@@ -296,7 +295,7 @@ metadata:
 		result, err := executor.executeExistsAssertion(assertion)
 
 		require.NoError(t, err)
-		assert.Equal(t, engine.StatusFail, result.Status)
+		assert.Equal(t, engine.StatusFail(), result.Status)
 		assert.Contains(t, result.Message, "not found")
 	})
 
@@ -311,7 +310,7 @@ metadata:
 		result, err := executor.executeExistsAssertion(assertion)
 
 		require.NoError(t, err)
-		assert.Equal(t, engine.StatusFail, result.Status)
+		assert.Equal(t, engine.StatusError(), result.Status)
 		assert.Contains(t, result.Message, "requires resource field")
 	})
 
@@ -326,7 +325,7 @@ metadata:
 		result, err := executor.executeExistsAssertion(assertion)
 
 		require.NoError(t, err)
-		assert.Equal(t, engine.StatusFail, result.Status)
+		assert.Equal(t, engine.StatusError(), result.Status)
 		assert.Contains(t, result.Message, "must be in format")
 	})
 }
@@ -355,7 +354,7 @@ metadata:
 		result, err := executor.executeNotExistsAssertion(assertion)
 
 		require.NoError(t, err)
-		assert.Equal(t, engine.StatusPass, result.Status)
+		assert.Equal(t, engine.StatusPass(), result.Status)
 		assert.Contains(t, result.Message, "not found (as expected)")
 	})
 
@@ -382,7 +381,7 @@ metadata:
 		result, err := executor.executeNotExistsAssertion(assertion)
 
 		require.NoError(t, err)
-		assert.Equal(t, engine.StatusFail, result.Status)
+		assert.Equal(t, engine.StatusFail(), result.Status)
 		assert.Contains(t, result.Message, "found (should not exist)")
 	})
 
@@ -397,7 +396,7 @@ metadata:
 		result, err := executor.executeNotExistsAssertion(assertion)
 
 		require.NoError(t, err)
-		assert.Equal(t, engine.StatusFail, result.Status)
+		assert.Equal(t, engine.StatusError(), result.Status)
 		assert.Contains(t, result.Message, "requires resource field")
 	})
 }
@@ -435,7 +434,7 @@ spec:
 		result, err := executor.executeFieldTypeAssertion(assertion)
 
 		require.NoError(t, err)
-		assert.Equal(t, engine.StatusPass, result.Status)
+		assert.Equal(t, engine.StatusPass(), result.Status)
 	})
 
 	t.Run("fails when field type does not match", func(t *testing.T) {
@@ -469,7 +468,7 @@ spec:
 		result, err := executor.executeFieldTypeAssertion(assertion)
 
 		require.NoError(t, err)
-		assert.Equal(t, engine.StatusFail, result.Status)
+		assert.Equal(t, engine.StatusFail(), result.Status)
 		assert.Contains(t, result.Message, "expected string")
 	})
 
@@ -484,14 +483,14 @@ spec:
 		assertion := api.Assertion{Name: "field-type-test", Type: "FieldType", Field: "spec.replicas", Value: "int"}
 		result, err := executor.executeFieldTypeAssertion(assertion)
 		require.NoError(t, err)
-		assert.Equal(t, engine.StatusFail, result.Status)
+		assert.Equal(t, engine.StatusError(), result.Status)
 		assert.Contains(t, result.Message, "requires resource field")
 
 		// Missing field
 		assertion = api.Assertion{Name: "field-type-test", Type: "FieldType", Resource: "Pod/test", Value: "int"}
 		result, err = executor.executeFieldTypeAssertion(assertion)
 		require.NoError(t, err)
-		assert.Equal(t, engine.StatusFail, result.Status)
+		assert.Equal(t, engine.StatusError(), result.Status)
 		assert.Contains(t, result.Message, "requires field")
 	})
 }
@@ -527,7 +526,7 @@ spec:
 		result, err := executor.executeFieldExistsAssertion(assertion)
 
 		require.NoError(t, err)
-		assert.Equal(t, engine.StatusPass, result.Status)
+		assert.Equal(t, engine.StatusPass(), result.Status)
 		assert.Contains(t, result.Message, "exists")
 	})
 
@@ -560,7 +559,7 @@ spec: {}
 		result, err := executor.executeFieldExistsAssertion(assertion)
 
 		require.NoError(t, err)
-		assert.Equal(t, engine.StatusFail, result.Status)
+		assert.Equal(t, engine.StatusFail(), result.Status)
 		assert.Contains(t, result.Message, "does not exist")
 	})
 }
@@ -595,7 +594,7 @@ spec: {}
 		result, err := executor.executeFieldNotExistsAssertion(assertion)
 
 		require.NoError(t, err)
-		assert.Equal(t, engine.StatusPass, result.Status)
+		assert.Equal(t, engine.StatusPass(), result.Status)
 		assert.Contains(t, result.Message, "does not exist (as expected)")
 	})
 
@@ -629,7 +628,7 @@ spec:
 		result, err := executor.executeFieldNotExistsAssertion(assertion)
 
 		require.NoError(t, err)
-		assert.Equal(t, engine.StatusFail, result.Status)
+		assert.Equal(t, engine.StatusFail(), result.Status)
 		assert.Contains(t, result.Message, "exists (should not exist)")
 	})
 }
@@ -667,7 +666,7 @@ spec:
 		result, err := executor.executeFieldValueAssertion(assertion)
 
 		require.NoError(t, err)
-		assert.Equal(t, engine.StatusPass, result.Status)
+		assert.Equal(t, engine.StatusPass(), result.Status)
 	})
 
 	t.Run("fails when field value does not match with ==", func(t *testing.T) {
@@ -702,7 +701,7 @@ spec:
 		result, err := executor.executeFieldValueAssertion(assertion)
 
 		require.NoError(t, err)
-		assert.Equal(t, engine.StatusFail, result.Status)
+		assert.Equal(t, engine.StatusFail(), result.Status)
 		assert.Contains(t, result.Message, "expected ==")
 	})
 
@@ -717,28 +716,28 @@ spec:
 		assertion := api.Assertion{Name: "field-value-test", Type: "FieldValue", Field: "spec.replicas", Operator: "==", Value: float64(3)}
 		result, err := executor.executeFieldValueAssertion(assertion)
 		require.NoError(t, err)
-		assert.Equal(t, engine.StatusFail, result.Status)
+		assert.Equal(t, engine.StatusError(), result.Status)
 		assert.Contains(t, result.Message, "requires resource field")
 
 		// Missing field
 		assertion = api.Assertion{Name: "field-value-test", Type: "FieldValue", Resource: "Pod/test", Operator: "==", Value: float64(3)}
 		result, err = executor.executeFieldValueAssertion(assertion)
 		require.NoError(t, err)
-		assert.Equal(t, engine.StatusFail, result.Status)
+		assert.Equal(t, engine.StatusError(), result.Status)
 		assert.Contains(t, result.Message, "requires field")
 
 		// Missing operator
 		assertion = api.Assertion{Name: "field-value-test", Type: "FieldValue", Resource: "Pod/test", Field: "spec.replicas", Value: 3}
 		result, err = executor.executeFieldValueAssertion(assertion)
 		require.NoError(t, err)
-		assert.Equal(t, engine.StatusFail, result.Status)
+		assert.Equal(t, engine.StatusError(), result.Status)
 		assert.Contains(t, result.Message, "requires operator field")
 
 		// Missing value
 		assertion = api.Assertion{Name: "field-value-test", Type: "FieldValue", Resource: "Pod/test", Field: "spec.replicas", Operator: "=="}
 		result, err = executor.executeFieldValueAssertion(assertion)
 		require.NoError(t, err)
-		assert.Equal(t, engine.StatusFail, result.Status)
+		assert.Equal(t, engine.StatusError(), result.Status)
 		assert.Contains(t, result.Message, "requires value field")
 	})
 
@@ -774,7 +773,7 @@ spec:
 		result, err := executor.executeFieldValueAssertion(assertion)
 
 		require.NoError(t, err)
-		assert.Equal(t, engine.StatusFail, result.Status)
+		assert.Equal(t, engine.StatusError(), result.Status)
 		assert.Contains(t, result.Message, "unsupported operator")
 	})
 }
@@ -791,13 +790,13 @@ func TestAssertionExecutor_executeAssertion(t *testing.T) {
 		assertion := api.Assertion{Name: "test", Type: "Count", Value: 0}
 		result, err := executor.executeAssertion(assertion)
 		require.NoError(t, err)
-		assert.Equal(t, engine.StatusPass, result.Status)
+		assert.Equal(t, engine.StatusPass(), result.Status)
 
 		// Test unsupported type
 		assertion = api.Assertion{Name: "test", Type: "Unsupported", Value: "test"}
 		result, err = executor.executeAssertion(assertion)
 		require.NoError(t, err)
-		assert.Equal(t, engine.StatusFail, result.Status)
+		assert.Equal(t, engine.StatusError(), result.Status)
 		assert.Contains(t, result.Message, "unsupported assertion type")
 	})
 }

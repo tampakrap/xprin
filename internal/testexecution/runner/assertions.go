@@ -75,7 +75,7 @@ func (e *assertionExecutor) executeAssertion(assertion api.Assertion) (engine.As
 	default:
 		return engine.NewAssertionResult(
 			assertion.Name,
-			engine.StatusFail,
+			engine.StatusError(),
 			fmt.Sprintf("unsupported assertion type: %s", assertion.Type),
 		), nil
 	}
@@ -92,7 +92,7 @@ func (e *assertionExecutor) executeCountAssertion(assertion api.Assertion) (engi
 		} else {
 			return engine.NewAssertionResult(
 				assertion.Name,
-				engine.StatusFail,
+				engine.StatusError(),
 				fmt.Sprintf("count assertion value must be a number, got %T", assertion.Value),
 			), nil
 		}
@@ -110,9 +110,9 @@ func (e *assertionExecutor) executeCountAssertion(assertion api.Assertion) (engi
 		message = fmt.Sprintf("expected %d resources, got %d", expectedCount, actualCount)
 	}
 
-	status := engine.StatusFail
+	status := engine.StatusFail()
 	if passed {
-		status = engine.StatusPass
+		status = engine.StatusPass()
 	}
 
 	return engine.NewAssertionResult(assertion.Name, status, message), nil
@@ -123,13 +123,13 @@ func (e *assertionExecutor) executeExistsAssertion(assertion api.Assertion) (eng
 	// Get the expected resource identifier from the assertion resource field
 	resourceIdentifier := assertion.Resource
 	if resourceIdentifier == "" {
-		return engine.NewAssertionResult(assertion.Name, engine.StatusFail, "exists assertion requires resource field"), nil
+		return engine.NewAssertionResult(assertion.Name, engine.StatusError(), "exists assertion requires resource field"), nil
 	}
 
 	// Parse the resource identifier (format: "Kind/name" or "Kind")
 	parts := strings.Split(resourceIdentifier, "/")
 	if len(parts) != 2 {
-		return engine.NewAssertionResult(assertion.Name, engine.StatusFail, fmt.Sprintf("exists assertion value must be in format 'Kind/name', got '%s'", resourceIdentifier)), nil
+		return engine.NewAssertionResult(assertion.Name, engine.StatusError(), fmt.Sprintf("exists assertion value must be in format 'Kind/name', got '%s'", resourceIdentifier)), nil
 	}
 
 	expectedKind := parts[0]
@@ -165,9 +165,9 @@ func (e *assertionExecutor) executeExistsAssertion(assertion api.Assertion) (eng
 		message = fmt.Sprintf("resource %s/%s not found", expectedKind, expectedName)
 	}
 
-	status := engine.StatusFail
+	status := engine.StatusFail()
 	if found {
-		status = engine.StatusPass
+		status = engine.StatusPass()
 	}
 
 	return engine.NewAssertionResult(assertion.Name, status, message), nil
@@ -180,7 +180,7 @@ func (e *assertionExecutor) executeNotExistsAssertion(assertion api.Assertion) (
 	// Get the resource identifier from the assertion resource field
 	resourceIdentifier := assertion.Resource
 	if resourceIdentifier == "" {
-		return engine.NewAssertionResult(assertion.Name, engine.StatusFail, "not exists assertion requires resource field"), nil
+		return engine.NewAssertionResult(assertion.Name, engine.StatusError(), "not exists assertion requires resource field"), nil
 	}
 
 	// Parse the resource identifier (format: "Kind" or "Kind/name")
@@ -202,7 +202,7 @@ func (e *assertionExecutor) executeNotExistsAssertion(assertion api.Assertion) (
 		expectedName = parts[1]
 		checkSpecificName = true
 	default:
-		return engine.NewAssertionResult(assertion.Name, engine.StatusFail, fmt.Sprintf("not exists assertion value must be in format 'Kind' or 'Kind/name', got '%s'", resourceIdentifier)), nil
+		return engine.NewAssertionResult(assertion.Name, engine.StatusError(), fmt.Sprintf("not exists assertion value must be in format 'Kind' or 'Kind/name', got '%s'", resourceIdentifier)), nil
 	}
 
 	// Search for the resource in rendered outputs
@@ -253,9 +253,9 @@ func (e *assertionExecutor) executeNotExistsAssertion(assertion api.Assertion) (
 		}
 	}
 
-	status := engine.StatusPass
+	status := engine.StatusPass()
 	if found {
-		status = engine.StatusFail
+		status = engine.StatusFail()
 	}
 
 	return engine.NewAssertionResult(assertion.Name, status, message), nil
@@ -265,27 +265,27 @@ func (e *assertionExecutor) executeNotExistsAssertion(assertion api.Assertion) (
 func (e *assertionExecutor) executeFieldTypeAssertion(assertion api.Assertion) (engine.AssertionResult, error) {
 	// Validate required fields
 	if assertion.Resource == "" {
-		return engine.NewAssertionResult(assertion.Name, engine.StatusFail, "field type assertion requires resource field"), nil
+		return engine.NewAssertionResult(assertion.Name, engine.StatusError(), "field type assertion requires resource field"), nil
 	}
 
 	if assertion.Field == "" {
-		return engine.NewAssertionResult(assertion.Name, engine.StatusFail, "field type assertion requires field"), nil
+		return engine.NewAssertionResult(assertion.Name, engine.StatusError(), "field type assertion requires field"), nil
 	}
 
 	if assertion.Value == nil {
-		return engine.NewAssertionResult(assertion.Name, engine.StatusFail, "field type assertion requires value field"), nil
+		return engine.NewAssertionResult(assertion.Name, engine.StatusError(), "field type assertion requires value field"), nil
 	}
 
 	// Get expected type
 	expectedType, ok := assertion.Value.(string)
 	if !ok {
-		return engine.NewAssertionResult(assertion.Name, engine.StatusFail, fmt.Sprintf("field type assertion value must be a string, got %T", assertion.Value)), nil
+		return engine.NewAssertionResult(assertion.Name, engine.StatusError(), fmt.Sprintf("field type assertion value must be a string, got %T", assertion.Value)), nil
 	}
 
 	// Parse the resource identifier (format: "Kind/name")
 	parts := strings.Split(assertion.Resource, "/")
 	if len(parts) != 2 {
-		return engine.NewAssertionResult(assertion.Name, engine.StatusFail, fmt.Sprintf("field type assertion resource must be in format 'Kind/name', got '%s'", assertion.Resource)), nil
+		return engine.NewAssertionResult(assertion.Name, engine.StatusError(), fmt.Sprintf("field type assertion resource must be in format 'Kind/name', got '%s'", assertion.Resource)), nil
 	}
 
 	expectedKind := parts[0]
@@ -294,13 +294,13 @@ func (e *assertionExecutor) executeFieldTypeAssertion(assertion api.Assertion) (
 	// Find the resource in rendered outputs
 	resource, err := e.findResource(expectedKind, expectedName)
 	if err != nil {
-		return engine.NewAssertionResult(assertion.Name, engine.StatusFail, err.Error()), nil
+		return engine.NewAssertionResult(assertion.Name, engine.StatusError(), err.Error()), nil
 	}
 
 	// Navigate to the field value
 	fieldValue, err := e.getFieldValue(resource.UnstructuredContent(), assertion.Field)
 	if err != nil {
-		return engine.NewAssertionResult(assertion.Name, engine.StatusFail, fmt.Sprintf("failed to get field %s: %v", assertion.Field, err)), nil
+		return engine.NewAssertionResult(assertion.Name, engine.StatusError(), fmt.Sprintf("failed to get field %s: %v", assertion.Field, err)), nil
 	}
 
 	// Check the type
@@ -314,9 +314,9 @@ func (e *assertionExecutor) executeFieldTypeAssertion(assertion api.Assertion) (
 		message = fmt.Sprintf("field %s has type %s, expected %s", assertion.Field, actualType, expectedType)
 	}
 
-	status := engine.StatusFail
+	status := engine.StatusFail()
 	if passed {
-		status = engine.StatusPass
+		status = engine.StatusPass()
 	}
 
 	return engine.NewAssertionResult(assertion.Name, status, message), nil
@@ -326,17 +326,17 @@ func (e *assertionExecutor) executeFieldTypeAssertion(assertion api.Assertion) (
 func (e *assertionExecutor) executeFieldExistsAssertion(assertion api.Assertion) (engine.AssertionResult, error) {
 	// Validate required fields
 	if assertion.Resource == "" {
-		return engine.NewAssertionResult(assertion.Name, engine.StatusFail, "field exists assertion requires resource field"), nil
+		return engine.NewAssertionResult(assertion.Name, engine.StatusError(), "field exists assertion requires resource field"), nil
 	}
 
 	if assertion.Field == "" {
-		return engine.NewAssertionResult(assertion.Name, engine.StatusFail, "field exists assertion requires field"), nil
+		return engine.NewAssertionResult(assertion.Name, engine.StatusError(), "field exists assertion requires field"), nil
 	}
 
 	// Parse the resource identifier (format: "Kind/name")
 	parts := strings.Split(assertion.Resource, "/")
 	if len(parts) != 2 {
-		return engine.NewAssertionResult(assertion.Name, engine.StatusFail, fmt.Sprintf("field exists assertion resource must be in format 'Kind/name', got '%s'", assertion.Resource)), nil
+		return engine.NewAssertionResult(assertion.Name, engine.StatusError(), fmt.Sprintf("field exists assertion resource must be in format 'Kind/name', got '%s'", assertion.Resource)), nil
 	}
 
 	expectedKind := parts[0]
@@ -345,13 +345,13 @@ func (e *assertionExecutor) executeFieldExistsAssertion(assertion api.Assertion)
 	// Find the resource in rendered outputs
 	resource, err := e.findResource(expectedKind, expectedName)
 	if err != nil {
-		return engine.NewAssertionResult(assertion.Name, engine.StatusFail, err.Error()), nil
+		return engine.NewAssertionResult(assertion.Name, engine.StatusError(), err.Error()), nil
 	}
 
 	// Check if the field exists
 	fieldExists, err := e.checkFieldExists(resource.UnstructuredContent(), assertion.Field)
 	if err != nil {
-		return engine.NewAssertionResult(assertion.Name, engine.StatusFail, fmt.Sprintf("failed to check field %s: %v", assertion.Field, err)), nil
+		return engine.NewAssertionResult(assertion.Name, engine.StatusError(), fmt.Sprintf("failed to check field %s: %v", assertion.Field, err)), nil
 	}
 
 	var message string
@@ -361,9 +361,9 @@ func (e *assertionExecutor) executeFieldExistsAssertion(assertion api.Assertion)
 		message = fmt.Sprintf("field %s does not exist", assertion.Field)
 	}
 
-	status := engine.StatusFail
+	status := engine.StatusFail()
 	if fieldExists {
-		status = engine.StatusPass
+		status = engine.StatusPass()
 	}
 
 	return engine.NewAssertionResult(assertion.Name, status, message), nil
@@ -373,17 +373,17 @@ func (e *assertionExecutor) executeFieldExistsAssertion(assertion api.Assertion)
 func (e *assertionExecutor) executeFieldNotExistsAssertion(assertion api.Assertion) (engine.AssertionResult, error) {
 	// Validate required fields
 	if assertion.Resource == "" {
-		return engine.NewAssertionResult(assertion.Name, engine.StatusFail, "field not exists assertion requires resource field"), nil
+		return engine.NewAssertionResult(assertion.Name, engine.StatusError(), "field not exists assertion requires resource field"), nil
 	}
 
 	if assertion.Field == "" {
-		return engine.NewAssertionResult(assertion.Name, engine.StatusFail, "field not exists assertion requires field"), nil
+		return engine.NewAssertionResult(assertion.Name, engine.StatusError(), "field not exists assertion requires field"), nil
 	}
 
 	// Parse the resource identifier (format: "Kind/name")
 	parts := strings.Split(assertion.Resource, "/")
 	if len(parts) != 2 {
-		return engine.NewAssertionResult(assertion.Name, engine.StatusFail, fmt.Sprintf("field not exists assertion resource must be in format 'Kind/name', got '%s'", assertion.Resource)), nil
+		return engine.NewAssertionResult(assertion.Name, engine.StatusError(), fmt.Sprintf("field not exists assertion resource must be in format 'Kind/name', got '%s'", assertion.Resource)), nil
 	}
 
 	expectedKind := parts[0]
@@ -392,13 +392,13 @@ func (e *assertionExecutor) executeFieldNotExistsAssertion(assertion api.Asserti
 	// Find the resource in rendered outputs
 	resource, err := e.findResource(expectedKind, expectedName)
 	if err != nil {
-		return engine.NewAssertionResult(assertion.Name, engine.StatusFail, err.Error()), nil
+		return engine.NewAssertionResult(assertion.Name, engine.StatusError(), err.Error()), nil
 	}
 
 	// Check if the field exists
 	fieldExists, err := e.checkFieldExists(resource.UnstructuredContent(), assertion.Field)
 	if err != nil {
-		return engine.NewAssertionResult(assertion.Name, engine.StatusFail, fmt.Sprintf("failed to check field %s: %v", assertion.Field, err)), nil
+		return engine.NewAssertionResult(assertion.Name, engine.StatusError(), fmt.Sprintf("failed to check field %s: %v", assertion.Field, err)), nil
 	}
 
 	// Pass if field does NOT exist
@@ -411,9 +411,9 @@ func (e *assertionExecutor) executeFieldNotExistsAssertion(assertion api.Asserti
 		message = fmt.Sprintf("field %s exists (should not exist)", assertion.Field)
 	}
 
-	status := engine.StatusFail
+	status := engine.StatusFail()
 	if passed {
-		status = engine.StatusPass
+		status = engine.StatusPass()
 	}
 
 	return engine.NewAssertionResult(assertion.Name, status, message), nil
@@ -423,25 +423,25 @@ func (e *assertionExecutor) executeFieldNotExistsAssertion(assertion api.Asserti
 func (e *assertionExecutor) executeFieldValueAssertion(assertion api.Assertion) (engine.AssertionResult, error) {
 	// Validate required fields
 	if assertion.Resource == "" {
-		return engine.NewAssertionResult(assertion.Name, engine.StatusFail, "field value assertion requires resource field"), nil
+		return engine.NewAssertionResult(assertion.Name, engine.StatusError(), "field value assertion requires resource field"), nil
 	}
 
 	if assertion.Field == "" {
-		return engine.NewAssertionResult(assertion.Name, engine.StatusFail, "field value assertion requires field"), nil
+		return engine.NewAssertionResult(assertion.Name, engine.StatusError(), "field value assertion requires field"), nil
 	}
 
 	if assertion.Operator == "" {
-		return engine.NewAssertionResult(assertion.Name, engine.StatusFail, "field value assertion requires operator field"), nil
+		return engine.NewAssertionResult(assertion.Name, engine.StatusError(), "field value assertion requires operator field"), nil
 	}
 
 	if assertion.Value == nil {
-		return engine.NewAssertionResult(assertion.Name, engine.StatusFail, "field value assertion requires value field"), nil
+		return engine.NewAssertionResult(assertion.Name, engine.StatusError(), "field value assertion requires value field"), nil
 	}
 
 	// Parse the resource identifier (format: "Kind/name")
 	parts := strings.Split(assertion.Resource, "/")
 	if len(parts) != 2 {
-		return engine.NewAssertionResult(assertion.Name, engine.StatusFail, fmt.Sprintf("field value assertion resource must be in format 'Kind/name', got '%s'", assertion.Resource)), nil
+		return engine.NewAssertionResult(assertion.Name, engine.StatusError(), fmt.Sprintf("field value assertion resource must be in format 'Kind/name', got '%s'", assertion.Resource)), nil
 	}
 
 	expectedKind := parts[0]
@@ -450,19 +450,19 @@ func (e *assertionExecutor) executeFieldValueAssertion(assertion api.Assertion) 
 	// Find the resource in rendered outputs
 	resource, err := e.findResource(expectedKind, expectedName)
 	if err != nil {
-		return engine.NewAssertionResult(assertion.Name, engine.StatusFail, err.Error()), nil
+		return engine.NewAssertionResult(assertion.Name, engine.StatusError(), err.Error()), nil
 	}
 
 	// Navigate to the field value
 	fieldValue, err := e.getFieldValue(resource.UnstructuredContent(), assertion.Field)
 	if err != nil {
-		return engine.NewAssertionResult(assertion.Name, engine.StatusFail, fmt.Sprintf("failed to get field %s: %v", assertion.Field, err)), nil
+		return engine.NewAssertionResult(assertion.Name, engine.StatusError(), fmt.Sprintf("failed to get field %s: %v", assertion.Field, err)), nil
 	}
 
 	// Compare the field value with the expected value
 	passed, err := e.compareFieldValue(fieldValue, assertion.Operator, assertion.Value)
 	if err != nil {
-		return engine.NewAssertionResult(assertion.Name, engine.StatusFail, fmt.Sprintf("failed to compare field value: %v", err)), nil
+		return engine.NewAssertionResult(assertion.Name, engine.StatusError(), fmt.Sprintf("failed to compare field value: %v", err)), nil
 	}
 
 	var message string
@@ -472,9 +472,9 @@ func (e *assertionExecutor) executeFieldValueAssertion(assertion api.Assertion) 
 		message = fmt.Sprintf("field %s is %v, expected %s %v", assertion.Field, fieldValue, assertion.Operator, assertion.Value)
 	}
 
-	status := engine.StatusFail
+	status := engine.StatusFail()
 	if passed {
-		status = engine.StatusPass
+		status = engine.StatusPass()
 	}
 
 	return engine.NewAssertionResult(assertion.Name, status, message), nil

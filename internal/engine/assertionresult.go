@@ -19,7 +19,7 @@ package engine
 // AssertionResult represents the result of executing an assertion.
 type AssertionResult struct {
 	Name    string
-	Status  Status // StatusPass or StatusFail
+	Status  Status
 	Message string
 }
 

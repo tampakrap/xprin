@@ -24,7 +24,7 @@
         [✓] RDS should exist - resource Cluster/platform-aws-rds found
         [✓] SecurityGroup should have a name - field metadata.name exists
         [✓] SecurityGroup description should be string - field spec.forProvider.description has expected type string
-        Total: 5 assertions, 5 successful, 0 failed
+        Total: 5 assertions, 5 successful, 0 failed, 0 errors
     Post-test Hooks:
         [✓] Post-test hook
             running post-test hook
