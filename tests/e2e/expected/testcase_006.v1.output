@@ -1,12 +1,12 @@
 === RUN   Missing required inputs (multiline error)
 --- FAIL: Missing required inputs (multiline error) (X.XXXs)
-    missing mandatory field: either 'claim' or 'xr' must be specified (it can be specified either in the test case or in the common inputs)
-    missing mandatory field: composition (it can be specified either in the test case or in the common inputs)
-    missing mandatory field: functions (it can be specified either in the test case or in the common inputs)
+    [!] missing mandatory field: either 'claim' or 'xr' must be specified (it can be specified either in the test case or in the common inputs)
+    [!] missing mandatory field: composition (it can be specified either in the test case or in the common inputs)
+    [!] missing mandatory field: functions (it can be specified either in the test case or in the common inputs)
 === RUN   Render failure (claim used as XR)
 --- FAIL: Render failure (claim used as XR) (X.XXXs)
     Render:
-        crossplane: error: composition's compositeTypeRef.kind (XAWSInfrastructure) does not match XR's kind (AWSInfrastructure)
+        [!] crossplane: error: composition's compositeTypeRef.kind (XAWSInfrastructure) does not match XR's kind (AWSInfrastructure)
 === RUN   Validation failure (missing CRD)
 --- FAIL: Validation failure (missing CRD) (X.XXXs)
     Validate:
@@ -54,16 +54,17 @@
 --- FAIL: Post-test hook failure (X.XXXs)
     Post-test Hooks:
         [x] Fail post-test hook [exit code: 1]
-=== RUN   Post-test hook template failure
---- FAIL: Post-test hook template failure (X.XXXs)
+=== RUN   Invalid Post-test hook, template rendering error
+--- FAIL: Invalid Post-test hook, template rendering error (X.XXXs)
     Post-test Hooks:
-        [x] Fail post-test hook (template rendering)
+        [!] Invalid post-test hook (template rendering error)
             error: failed to render hook template: failed to execute template: template: hook:1:16: executing "hook" at <.Outputs.UnknownField>: can't evaluate field UnknownField in type *engine.Outputs
 === RUN   Assertion failure
 --- FAIL: Assertion failure (X.XXXs)
     Assertions:
         [x] Resource count should be zero - expected 0 resources, got 2
-        Total: 2 assertions, 1 successful, 1 failed
+        [!] Wrong resource name - resource Cluster/doesnotexist not found
+        Total: 3 assertions, 1 successful, 1 failed, 1 error
 === RUN   Failed validation and assertion
 --- FAIL: Failed validation and assertion (X.XXXs)
     Validate:
@@ -72,7 +73,7 @@
         crossplane: error: cannot validate resources: could not validate all resources, schema(s) missing
     Assertions:
         [x] Failed assertion - expected 0 resources, got 2
-        Total: 2 assertions, 1 successful, 1 failed
+        Total: 2 assertions, 1 successful, 1 failed, 0 errors
 === RUN   Failed validation, assertion, and post-test hook
 --- FAIL: Failed validation, assertion, and post-test hook (X.XXXs)
     Validate:
@@ -81,7 +82,7 @@
         crossplane: error: cannot validate resources: could not validate all resources, schema(s) missing
     Assertions:
         [x] Failed assertion - expected 0 resources, got 2
-        Total: 2 assertions, 1 successful, 1 failed
+        Total: 2 assertions, 1 successful, 1 failed, 0 errors
     Post-test Hooks:
         [x] Failed post-test hook [exit code: 2]
 FAIL

@@ -263,6 +263,40 @@ These failures are collected and reported, but execution continues:
 - Verbose mode (`-v`) shows detailed error messages
 - Debug mode (`--debug`) shows even more detail
 
+## Statuses and output symbols
+
+xprin uses a small set of **statuses** and **symbols** in its output, aligned with [Crossplane `beta validate`](https://github.com/crossplane/crossplane/blob/main/cmd/crank/beta/validate/validate.go) so that **[✓]**, **[x]**, and **[!]** mean the same thing across tools.
+
+### Symbols
+
+| Symbol | Meaning |
+|--------|--------|
+| **[✓]** | Success: the check ran and passed. |
+| **[x]** | Failure: the check ran and the condition was false (e.g. assertion failed, hook exited non-zero). |
+| **[!]** | Other/operational: the check could not run (e.g. missing resource, invalid config, render failure, hook template error). |
+| **[s]** | Skipped: reserved for future use (intentionally skipped assertions). |
+
+### Where they appear
+
+- **Preliminary / test-level errors** (missing mandatory fields, failed to create dirs, etc.): each line of the error block is prefixed with **[!]**.
+- **Render failure**: the first line of the raw render output is prefixed with **[!]**; continuation lines are indented under it.
+- **Validate**: output is passed through from `crossplane beta validate`, which already uses **[✓]**, **[x]**, and **[!]**.
+- **Hooks**: **[✓]** for success; **[x]** when the hook process exited with a non-zero code; **[!]** when the hook could not run (e.g. template rendering failure).
+- **Assertions**: **[✓]** when the assertion ran and passed; **[x]** when it ran and the condition was false; **[!]** when it could not be evaluated (e.g. resource not found, invalid assertion config). The totals line reports successful, failed, and error counts.
+
+### Status values
+
+Internally, test and assertion outcomes use these **status** values (with the symbols above for display):
+
+| Status | Value | Symbol | Use |
+|--------|--------|--------|-----|
+| **Pass** | `PASS` | [✓] | Check ran and passed. |
+| **Fail** | `FAIL` | [x] | Check ran and failed (condition false or non-zero exit). |
+| **Skip** | `SKIP` | [s] | Intentionally skipped (reserved for future use). |
+| **Error** | `ERROR` | [!] | Check could not run (operational/infrastructure/config issue). |
+
+For more detail on the design and alignment with Crossplane, see [Symbol semantics: align with crossplane beta validate](design/symbol-semantics-validate-alignment.md).
+
 ## Common vs Test-Level Configuration
 
 xprin supports defining configuration at two levels: `common` (shared across all tests) and test case level (specific to a test).

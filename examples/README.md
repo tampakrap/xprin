@@ -759,7 +759,7 @@ xprin test examples/mytests/6_assertions/example1_assertions_xprin.yaml -v --sho
         [✓] Example null field check - field spec.forProvider.finalSnapshotIdentifier has expected type null
         [✓] RDS should be Aurora PostgreSQL - field spec.forProvider.engine is aurora-postgresql, expected is aurora-postgresql
         [✓] SecurityGroup port should equal 443 - field spec.forProvider.port is 443, expected == 443
-        Total: 15 assertions, 15 successful, 0 failed
+        Total: 15 assertions, 15 successful, 0 failed, 0 errors
 PASS
 ok	examples/mytests/6_assertions/example1_assertions_xprin.yaml	1.450s
 ```

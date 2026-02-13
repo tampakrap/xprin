@@ -1,6 +1,6 @@
 tests:
 
-# Failures before pipeline execution (before pre-test hooks or render)
+# Error before pipeline execution (before pre-test hooks or render)
 - name: "Missing required inputs (multiline error)"
 
 # Render failures
@@ -169,15 +169,19 @@ tests:
     - name: Another failed post-test hook, it should never be shown"
       run: exit 2
 
-- name: "Post-test hook template failure"
+- name: "Invalid Post-test hook, template rendering error"
   inputs:
     xr: ../../aws/xr.yaml
     composition: ../../aws/composition.yaml
     functions: ../../aws/functions.yaml
   hooks:
     post-test:
-    - name: "Fail post-test hook (template rendering)"
+    - name: "Invalid post-test hook (template rendering error)"
       run: echo "{{ .Outputs.UnknownField }}"
+    - name: "Successful post-test hook, it should never be shown"
+      run: echo "bye"
+    - name: "Failed post-test hook, it should never be shown"
+      run: exit 2
 
 # Assertion failures
 - name: "Assertion failure"
@@ -196,6 +200,10 @@ tests:
     - name: "Resource count should be zero"
       type: "Count"
       value: 0
+    - name: "Wrong resource name"
+      type: "FieldExists"
+      resource: "Cluster/doesnotexist"
+      field: "spec.forProvider.engine"
   hooks:
     pre-test:
     - run: echo "hello"
