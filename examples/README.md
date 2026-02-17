@@ -550,6 +550,7 @@ In this example, we use post-test hooks to:
 - Inspect the XR status from the rendered output using `{{ .Outputs.XR }}`
 - Display render count using `{{ .Outputs.RenderCount }}`
 - Show the render output file path using `{{ .Outputs.Render }}`
+- Show the assertions output path using `{{ .Outputs.Assertions }}`
 - Access specific rendered resources using `{{ index .Outputs.Rendered "SecurityGroup/platform-aws-sg" }}`
 - Compare input and output XRs using `dyff` with both `{{ .Inputs.XR }}` and `{{ .Outputs.XR }}`
 

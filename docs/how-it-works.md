@@ -154,7 +154,7 @@ flowchart TD
 4. **Result Parsing**: Validation output is parsed to determine success/failure
 
 **Output Files:**
-- `{{ .Outputs.Validate }}` - Validation output file
+- `{{ .Outputs.Validate }}` - Raw Validate output file
 
 **Error Handling:**
 - If `crossplane beta validate` fails, the test **continues** to assertions and post-test hooks
@@ -198,6 +198,9 @@ flowchart TD
 - Resources are identified by `Kind/name` format
 - Field paths use dot notation (e.g., `spec.replicas`, `metadata.labels.app`)
 
+**Output Files:**
+- `{{ .Outputs.Assertions }}` - Assertions output path
+
 ### Phase 6: Finish
 
 **What happens:**
@@ -210,6 +213,7 @@ flowchart TD
 - `{{ .Outputs.XR }}` - Path to XR file
 - `{{ .Outputs.Render }}` - Path to full rendered output
 - `{{ .Outputs.Validate }}` - Path to validation output (if validation ran)
+- `{{ .Outputs.Assertions }}` - Path to assertions output (assertions.txt; if assertions ran)
 - `{{ .Outputs.RenderCount }}` - Number of rendered resources
 - `{{ index .Outputs.Rendered "Kind/Name" }}` - Individual resource paths
 - `{{ .Tests.{test-id}.Outputs.* }}` - Cross-test references
@@ -374,6 +378,7 @@ Template variables use Go's `text/template` package for dynamic content.
 - `{{ .Outputs.XR }}` - XR file path
 - `{{ .Outputs.Render }}` - Full rendered output path
 - `{{ .Outputs.Validate }}` - Validation output path
+- `{{ .Outputs.Assertions }}` - Assertions output path (assertions.txt; if assertions ran)
 - `{{ .Outputs.RenderCount }}` - Number of rendered resources
 - `{{ index .Outputs.Rendered "Kind/Name" }}` - Individual resource paths
 

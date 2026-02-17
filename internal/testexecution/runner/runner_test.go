@@ -3067,6 +3067,49 @@ hooks:
 		assert.NotContains(t, out, "{{ .Outputs.Rendered }}")
 	})
 
+	t.Run("output variables - assertions path", func(t *testing.T) {
+		yaml := `
+hooks:
+  post-test:
+  - name: "assertions file"
+    run: "echo 'Assertions: {{ .Outputs.Assertions }}'"
+`
+		assertionsPath := "/path/to/assertions.txt"
+		outputs := &engine.Outputs{
+			XR:         "rendered-xr.yaml",
+			Render:     "rendered-resources.yaml",
+			Assertions: &assertionsPath,
+		}
+
+		templateContext := newTemplateContext(map[string]string{}, api.Inputs{}, outputs, map[string]*engine.TestCaseResult{})
+		runner := &Runner{}
+		out, err := runner.renderTemplate(yaml, templateContext, "test")
+		require.NoError(t, err)
+		assert.Contains(t, out, "echo 'Assertions: /path/to/assertions.txt'")
+		assert.NotContains(t, out, "{{ .Outputs.Assertions }}")
+	})
+
+	t.Run("output variables - assertions nil", func(t *testing.T) {
+		yaml := `
+hooks:
+  post-test:
+  - name: "assertions file"
+    run: "echo 'Assertions: {{ .Outputs.Assertions }}'"
+`
+		outputs := &engine.Outputs{
+			XR:         "rendered-xr.yaml",
+			Render:     "rendered-resources.yaml",
+			Assertions: nil, // No assertions run
+		}
+
+		templateContext := newTemplateContext(map[string]string{}, api.Inputs{}, outputs, map[string]*engine.TestCaseResult{})
+		runner := &Runner{}
+		out, err := runner.renderTemplate(yaml, templateContext, "test")
+		require.NoError(t, err)
+		assert.Contains(t, out, "echo 'Assertions: <nil>'")
+		assert.NotContains(t, out, "{{ .Outputs.Assertions }}")
+	})
+
 	t.Run("mixed template variables", func(t *testing.T) {
 		yaml := `
 common:

@@ -696,6 +696,18 @@ func (r *Runner) runTestCase(testCase api.TestCase, testSuiteResult *engine.Test
 		if r.Debug {
 			utils.DebugPrintf("Assertions executed\n")
 		}
+
+		// Write raw assertion results to assertions.txt (raw == all assertions, regardless of the Verbose or ShowAssertions flags)
+		assertionsFile := filepath.Join(r.outputsDir, "assertions.txt")
+		if err := afero.WriteFile(r.fs, assertionsFile, []byte(result.RawAssertionsOutput), 0o600); err != nil {
+			return result.Fail(fmt.Errorf("failed to write assertions output to file: %w", err))
+		}
+
+		result.Outputs.Assertions = &assertionsFile
+
+		if r.Debug {
+			utils.DebugPrintf("Wrote assertions output to: %s\n", assertionsFile)
+		}
 	}
 
 	// Execute post-test hooks (after assertions)
@@ -724,6 +736,10 @@ func (r *Runner) runTestCase(testCase api.TestCase, testSuiteResult *engine.Test
 		result.Outputs.XR = filepath.Join(artifactsDir, "xr.yaml")
 		if result.Outputs.Validate != nil {
 			*result.Outputs.Validate = filepath.Join(artifactsDir, "validate.txt")
+		}
+
+		if result.Outputs.Assertions != nil {
+			*result.Outputs.Assertions = filepath.Join(artifactsDir, "assertions.txt")
 		}
 
 		// Update Rendered map paths to point to artifact paths
