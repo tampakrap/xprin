@@ -21,6 +21,27 @@ A Crossplane testing framework that leverages `crossplane render` and `crossplan
 - **Test Chaining**: Export testcase outputs as artifacts for use in follow-up tests to better emulate the reconciliation process
 - **CI/CD Ready**: Easy integration into any system or pipeline
 
+## FAQ
+
+**Why was xprin created?**  
+To bridge the testing gap between function-level testing and full e2e testing: you can run render and validate locally with real Compositions and Functions, without a live cluster or real resource creation.
+
+**What are typical use cases?**
+- **Composition testing** – Render XRs/Claims with Compositions (and optional Functions) and assert on the output.
+- **Schema validation** – Validate mock or production-like manifests with CRDs via `crossplane beta validate`.
+- **Reconciliation emulation** – Chain tests with exported artifacts so later tests consume prior outputs (e.g. observed resources, status).
+- **Advanced render inputs** – Drive render with extra resources, observed resources, additional context, environment configs, in multiple tests run one after the other.
+- **Upgrades** – Validate upgrades of Crossplane itself, providers, functions before or after adoption.
+
+**Can I test using my production XRs/Claims or data?**  
+Yes. xprin runs entirely locally in a mock environment. It does not create or modify real resources; it only runs `crossplane render` and `crossplane beta validate` on the inputs you provide, so you can safely point at production-like or copied production data.
+
+**What is the purpose of patching**  
+To extend coverage, t be able to create as many test cases we need without having to provide testdata for each one of them. For example, assuming I want to check if my composition behaves properly when a specific label in my XR is present or not, I can easily patch a single XR instead of having to copy and edit it.
+
+**What does “xprin” mean?**  
+Crossplane + [πριν](https://en.wiktionary.org/wiki/%CF%80%CF%81%CE%AF%CE%BD), before Crossplane! ([backstory](https://github.com/crossplane/org/issues/103#issuecomment-3493403731))
+
 ## How it works
 
 When xprin runs a test case, it follows this specific sequence:
