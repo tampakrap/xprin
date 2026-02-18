@@ -1,5 +1,12 @@
 # xprin
 
+[![CI](https://github.com/crossplane-contrib/xprin/actions/workflows/ci.yaml/badge.svg)](https://github.com/crossplane-contrib/xprin/actions/workflows/ci.yaml) [![Release](https://img.shields.io/github/v/release/crossplane-contrib/xprin)](https://github.com/crossplane-contrib/xprin/releases)
+
+<!-- Logo: add docs/images/logo.png to display the project logo -->
+<p align="center">
+  <img src="docs/images/xprin-logo.png" alt="xprin logo" />
+</p>
+
 A Crossplane testing framework that leverages `crossplane render` and `crossplane beta validate` commands to test if Compositions render correctly against Claims or XRs, and if the rendered manifests validate against their schemas.
 
 ## Features
@@ -18,53 +25,39 @@ A Crossplane testing framework that leverages `crossplane render` and `crossplan
 
 When xprin runs a test case, it follows this specific sequence:
 
-1. **Pre-test hooks** - Execute any pre-test hooks defined in the test case
-2. **Convert Claim to XR** (optional) - If using a Claim input, convert it to XR using `xprin-helpers convert-claim-to-xr`
-3. **Patch XR** (optional) - Apply patches (XRD defaults, connection secrets) using `xprin-helpers patch-xr`
-4. **Crossplane render** - Run `crossplane render` with the XR, Composition, and Functions
-5. **Crossplane validate** (optional) - If CRDs are provided, run `crossplane beta validate` on the rendered output
-6. **Assertions** (optional) - Validate rendered resources using declarative assertions (count, existence, field type/value checks)
-7. **Post-test hooks** - Execute any post-test hooks defined in the test case
-8. **Export artifacts** (optional) - If test case has an `id`, copy outputs to artifacts directory for cross-test references
+1. **Setup** - Set up environment, expand paths, collect inputs, and copy them to a temporary directory for patching
+2. **Pre-test Hooks** - Execute any pre-test hooks defined in the test case
+3. **Convert Claim to XR** (optional) - If using a Claim input, convert it to XR using `xprin-helpers convert-claim-to-xr`
+4. **Patch XR** (optional) - Apply patches (XRD defaults, connection secrets) using `xprin-helpers patch-xr`
+5. **Crossplane Render** - Run `crossplane render` with the XR, Composition, and Functions
+6. **Crossplane Validate** (optional) - If CRDs are provided, run `crossplane beta validate` on the rendered output
+7. **Assertions** (optional) - Validate rendered resources using declarative assertions (count, existence, field type/value checks)
+8. **Post-test Hooks** - Execute any post-test hooks defined in the test case
+9. **Export Artifacts** (optional) - If test case has an `id`, copy outputs to artifacts directory for cross-test references
 
-Visual flow diagram:
+Visual flow (high-level steps):
 
 ```mermaid
 flowchart TD
-    A["Start Test Case<br/>• Expand inputs<br/>• Check paths<br/>• Copy inputs to tmp dir"] --> B["Pre-test Hooks<br/>• Setup environment<br/>• Patch inputs<br/>• Pre-validate inputs"]
-    B --> C{"Claim input?"}
-    C -->|Yes| D["Convert Claim to XR<br/>xprin-helpers convert-claim-to-xr"]
-    C -->|No| E["Use XR directly"]
-    D --> F{"Patch XR?"}
-    E --> F
-    F -->|Yes| G["xprin-helpers patch-xr<br/>• Apply XRD defaults<br/>• Add connection secret"]
-    F -->|No| I["crossplane render"]
-    G --> I
-    I --> J{"CRDs provided?"}
-    J -->|Yes| K["crossplane beta validate"]
-    J -->|No| L["Assertions<br/>• Count resources<br/>• Check existence<br/>• Validate fields"]
-    K --> L
-    L --> M["Post-test Hooks<br/>• Cleanup<br/>• Validate outputs"]
-    M --> N{"Test case has ID?"}
-    N -->|Yes| O["Export Artifacts"]
-    N -->|No| P["End Test Case"]
-    O --> P
+    A["Setup<br/>Pre-test Hooks"] --> B[Convert Claim to XR]
+    A --> C[Patch XR]
+    B --> D[Render]
+    C --> D
+    D --> E[Validate]
+    D --> F[Assertions]
+    E --> G[Post-test Hooks<br/>Export Artifacts]
+    F --> G
 
-    %% Color scheme: Group related operations with white text for readability
-    classDef xprin fill:#3b82f6,stroke:#1e40af,stroke-width:2px,color:#fff
-    classDef xprinHelpers fill:#f97316,stroke:#c2410c,stroke-width:2px,color:#fff
-    classDef crossplane fill:#a855f7,stroke:#7e22ce,stroke-width:2px,color:#fff
-    classDef validation fill:#10b981,stroke:#047857,stroke-width:2px,color:#fff
-    classDef neutral fill:#6b7280,stroke:#374151,stroke-width:2px,color:#fff
-    classDef decision fill:#f3f4f6,stroke:#9ca3af,stroke-width:2px,color:#000
-
-    class A,B,M,O,P xprin
-    class D,G xprinHelpers
-    class I,K crossplane
-    class L validation
-    class E neutral
-    class C,F,J,N decision
+    style A fill:#3b82f6,stroke:#1e40af,stroke-width:2px,color:#fff
+    style B fill:#f97316,stroke:#c2410c,stroke-width:2px,color:#fff
+    style C fill:#f97316,stroke:#c2410c,stroke-width:2px,color:#fff
+    style D fill:#a855f7,stroke:#7e22ce,stroke-width:2px,color:#fff
+    style E fill:#a855f7,stroke:#7e22ce,stroke-width:2px,color:#fff
+    style F fill:#10b981,stroke:#047857,stroke-width:2px,color:#fff
+    style G fill:#3b82f6,stroke:#1e40af,stroke-width:2px,color:#fff
 ```
+
+For the full flow with decision points and optional steps, see [How It Works](docs/how-it-works.md).
 
 The flow ensures that:
 - Pre-test hooks can set up the environment, patch inputs or validate them before processing
