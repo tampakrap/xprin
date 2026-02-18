@@ -55,8 +55,8 @@ lint: .bin/golangci-lint ## runs lint
 test: ## runs tests
 	go test ./...
 
-.PHONY: test-e2e
-test-e2e: build-all ## runs e2e tests
+.PHONY: e2e
+e2e: build-all ## runs e2e tests
 	@bash tests/e2e/scripts/run.sh
 
 .PHONY: fmt

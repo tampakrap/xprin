@@ -114,7 +114,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        earthly_target: [test-e2e-v1, test-e2e-v2]
+        earthly_target: [e2e-v1, e2e-v2]
 
     steps:
       - name: Checkout

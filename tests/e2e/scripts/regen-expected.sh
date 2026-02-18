@@ -1,13 +1,18 @@
 #!/bin/bash
 # regen-expected.sh - Regenerate e2e expected output files (run inside container)
 #
-# Usage: regen-expected.sh [v1|v2|cleanup|all]
-#   No arg or "all": run v1 pass, v2 pass, then remove redundant .v1.output (needs CROSSPLANE_V1 and CROSSPLANE_V2).
-#   v1: run only v1 pass (needs CROSSPLANE_V1). No cleanup.
-#   v2: run only v2 pass (needs CROSSPLANE_V2). No cleanup.
-#   cleanup: only remove .v1.output files identical to .output (no crossplane needed).
+# Behavior is driven by the following environment variables:
 #
-# Used by: earthly +regen-e2e-expected
+#   GENERATE=true
+#     Find crossplane in PATH -> get version -> XP_MAJOR (same as run.sh) -> output suffix
+#     (.v1.output or .output) -> run one generate pass.
+#
+#   CLEANUP=true
+#     Run cleanup (remove redundant .v1.output identical to .output). Can be standalone or
+#     after both passes when CROSSPLANE_V1+V2 are set.
+#
+#   CROSSPLANE_V1 and CROSSPLANE_V2 (paths)
+#     Run generate for V1 (.v1.output), then for V2 (.output). Run cleanup only if CLEANUP=true.
 
 set -euo pipefail
 
@@ -20,79 +25,30 @@ GEN_INVALID_TESTS_SCRIPT="${SCRIPT_DIR}/gen-invalid-tests.sh"
 E2E_TESTS_DIR="${PROJECT_ROOT}/examples/mytests/0_e2e"
 XPRIN_BIN="${XPRIN_BIN:-${PROJECT_ROOT}/xprin}"
 
-# Parse mode: v1 | v2 | cleanup | all (default)
-MODE="${1:-all}"
-case "${MODE}" in
-    v1|v2|cleanup|all) ;;
-    *)
-        echo "Usage: $0 [v1|v2|cleanup|all]"
-        echo "  No arg or 'all': run v1 and v2 passes, then cleanup."
-        echo "  v1: run only v1 pass (no cleanup)."
-        echo "  v2: run only v2 pass (no cleanup)."
-        echo "  cleanup: only remove redundant .v1.output files."
-        exit 1
-        ;;
-esac
-
 cd "${PROJECT_ROOT}"
 
 # Clean up generated_*.yaml on exit (created by gen-invalid-tests.sh)
 trap 'rm -f "${E2E_TESTS_DIR}"/generated_*.yaml' EXIT
 
-# Generate schema-invalid e2e testsuite files when running test passes (v1/v2/all)
-if [ "${MODE}" != "cleanup" ]; then
-    export E2E_TESTS_DIR
-    "${GEN_INVALID_TESTS_SCRIPT}"
-fi
-
-if [ ! -f "${TESTCASES_FILE}" ]; then
-    echo "Test case list not found: ${TESTCASES_FILE}"
-    exit 1
-fi
-
-if [ "${MODE}" != "cleanup" ] && [ ! -x "${XPRIN_BIN}" ]; then
-    echo "xprin binary not found or not executable: ${XPRIN_BIN}"
-    exit 1
-fi
-
-if [ ! -f "${NORMALIZE_SCRIPT}" ]; then
-    echo "Normalize script not found: ${NORMALIZE_SCRIPT}"
-    exit 1
-fi
-
-# shellcheck source=/dev/null
-source "${TESTCASES_FILE}"
-
-TEST_CASES=($(compgen -v | grep '^testcase_' | grep -v '_exit$' | LC_ALL=C sort))
-
-if [ "${#TEST_CASES[@]}" -eq 0 ]; then
-    echo "No test cases defined in ${TESTCASES_FILE}"
-    exit 1
-fi
-
-# Require crossplane binaries only for the modes that use them
-if [ "${MODE}" = "v1" ] || [ "${MODE}" = "all" ]; then
-    if [ -z "${CROSSPLANE_V1:-}" ]; then
-        echo "CROSSPLANE_V1 (path to crossplane binary) is required for mode: ${MODE}"
-        exit 1
+# Detect Crossplane major version (1 or 2) from binary - same logic as run.sh
+xp_major_from_binary() {
+    local bin="$1"
+    local ver
+    ver="$("${bin}" version --client 2>/dev/null | cut -d':' -f2 | xargs || true)"
+    if [[ "${ver}" == v1.* ]]; then
+        echo 1
+    elif [[ "${ver}" == v2.* ]]; then
+        echo 2
+    else
+        echo 2
     fi
-    if [ ! -x "${CROSSPLANE_V1}" ]; then
-        echo "CROSSPLANE_V1 not executable: ${CROSSPLANE_V1}"
-        exit 1
-    fi
-fi
-if [ "${MODE}" = "v2" ] || [ "${MODE}" = "all" ]; then
-    if [ -z "${CROSSPLANE_V2:-}" ]; then
-        echo "CROSSPLANE_V2 (path to crossplane binary) is required for mode: ${MODE}"
-        exit 1
-    fi
-    if [ ! -x "${CROSSPLANE_V2}" ]; then
-        echo "CROSSPLANE_V2 not executable: ${CROSSPLANE_V2}"
-        exit 1
-    fi
-fi
+}
 
-# Run one pass: PATH is set so crossplane is the binary for this pass; suffix is .v1.output or .output.
+# Map XP_MAJOR to expected output suffix: .v1.output or .output
+expected_suffix_for_xp_major() {
+    [ "$1" = "1" ] && echo ".v1.output" || echo ".output"
+}
+
 run_pass() {
     local suffix="$1"
     echo "Regenerating expected outputs (suffix=${suffix}) into ${EXPECTED_DIR}"
@@ -137,23 +93,75 @@ run_cleanup() {
     echo ""
 }
 
-if [ "${MODE}" = "v1" ] || [ "${MODE}" = "all" ]; then
-    export PATH="$(dirname "${CROSSPLANE_V1}"):${PATH}"
-    which "${CROSSPLANE_V1}"
-    ${CROSSPLANE_V1} version --client
-    run_pass ".v1.output"
+if [ "${GENERATE:-}" = "true" ] || [ -n "${CROSSPLANE_V1:-}" ] || [ -n "${CROSSPLANE_V2:-}" ]; then
+    if [ ! -f "${TESTCASES_FILE}" ]; then
+        echo "Test case list not found: ${TESTCASES_FILE}"
+        exit 1
+    fi
+    if [ ! -x "${XPRIN_BIN}" ]; then
+        echo "xprin binary not found or not executable: ${XPRIN_BIN}"
+        exit 1
+    fi
+    if [ ! -f "${NORMALIZE_SCRIPT}" ]; then
+        echo "Normalize script not found: ${NORMALIZE_SCRIPT}"
+        exit 1
+    fi
+    # shellcheck source=/dev/null
+    source "${TESTCASES_FILE}"
+
+    TEST_CASES=($(compgen -v | grep '^testcase_' | grep -v '_exit$' | LC_ALL=C sort))
+    if [ "${#TEST_CASES[@]}" -eq 0 ]; then
+        echo "No test cases defined in ${TESTCASES_FILE}"
+        exit 1
+    fi
+
+    export E2E_TESTS_DIR
+
+    # Generate schema-invalid e2e testsuite files so they are not committed.
+    "${GEN_INVALID_TESTS_SCRIPT}"
+
+    if [ -n "${GENERATE:-}" ] && ([ -n "${CROSSPLANE_V1:-}" ] || [ -n "${CROSSPLANE_V2:-}" ]); then
+        echo "Error: GENERATE and CROSSPLANE_V1/CROSSPLANE_V2 cannot be set at the same time"
+        exit 1
+    fi
+
+    # --- Both: CROSSPLANE_V1 and CROSSPLANE_V2 (paths) ---
+    if [ -n "${CROSSPLANE_V1:-}" ] && [ -n "${CROSSPLANE_V2:-}" ]; then
+        if [ ! -x "${CROSSPLANE_V1}" ]; then
+            echo "CROSSPLANE_V1 not executable: ${CROSSPLANE_V1}"
+            exit 1
+        fi
+        if [ ! -x "${CROSSPLANE_V2}" ]; then
+            echo "CROSSPLANE_V2 not executable: ${CROSSPLANE_V2}"
+            exit 1
+        fi
+        export PATH="$(dirname "${CROSSPLANE_V1}"):${PATH}"
+        which "${CROSSPLANE_V1}"
+        ${CROSSPLANE_V1} version --client
+        run_pass ".v1.output"
+        export PATH="$(dirname "${CROSSPLANE_V2}"):${PATH}"
+        which "${CROSSPLANE_V2}"
+        ${CROSSPLANE_V2} version --client
+        run_pass ".output"
+        echo "Done. Wrote expected file(s) to ${EXPECTED_DIR}."
+    fi
+
+    # --- Single: GENERATE=true, crossplane from PATH ---
+    if [ "${GENERATE:-}" = "true" ]; then
+        CROSSPLANE_BIN="$(command -v crossplane || true)"
+        if [ -z "${CROSSPLANE_BIN}" ] || [ ! -x "${CROSSPLANE_BIN}" ]; then
+            echo "crossplane not found or not executable on PATH"
+            exit 1
+        fi
+        SUFFIX="$(expected_suffix_for_xp_major "$(xp_major_from_binary "${CROSSPLANE_BIN}")")"
+        export PATH="$(dirname "${CROSSPLANE_BIN}"):${PATH}"
+        which crossplane
+        crossplane version --client
+        run_pass "${SUFFIX}"
+        echo "Done. Wrote expected file(s) to ${EXPECTED_DIR}."
+    fi
 fi
 
-if [ "${MODE}" = "v2" ] || [ "${MODE}" = "all" ]; then
-    export PATH="$(dirname "${CROSSPLANE_V2}"):${PATH}"
-    which "${CROSSPLANE_V2}"
-    ${CROSSPLANE_V2} version --client
-    run_pass ".output"
-fi
-
-# Cleanup only when we have or had both sets (all) or when explicitly requested (cleanup)
-if [ "${MODE}" = "all" ] || [ "${MODE}" = "cleanup" ]; then
+if [ "${CLEANUP:-}" = "true" ]; then
     run_cleanup
 fi
-
-echo "Done. Wrote expected file(s) to ${EXPECTED_DIR}."

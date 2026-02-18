@@ -45,6 +45,11 @@ generate:
 tidy:
   BUILD +go-modules-tidy
 
+# e2e runs the end-to-end tests against both Crossplane v1 and v2.
+e2e:
+  BUILD +e2e-v1
+  BUILD +e2e-v2
+
 # go-modules downloads xprin's go modules. It's the base target of most Go
 # related target (go-build, etc).
 go-modules:
@@ -145,7 +150,8 @@ go-lint:
   SAVE ARTIFACT cmd AS LOCAL cmd
   SAVE ARTIFACT internal AS LOCAL internal
 
-# crossplane-cli builds the Crossplane CLI binary (cached by Earthly; reused across test-e2e runs).
+# crossplane-cli builds the Crossplane CLI binary (cached by Earthly; reused across e2e runs).
+# If no CROSSPLANE_VERSION is provided, it will use the latest stable version.
 crossplane-cli:
   ARG CROSSPLANE_VERSION
   FROM alpine:3.20
@@ -154,8 +160,10 @@ crossplane-cli:
   RUN mv crossplane /usr/local/bin/crossplane
   SAVE ARTIFACT /usr/local/bin/crossplane
 
-# test-e2e runs e2e tests (uses +crossplane-cli artifact so the CLI install is cached).
-test-e2e:
+# e2e-run runs e2e tests using a specific Crossplane version.
+# If no CROSSPLANE_VERSION is provided, it will use the latest stable version.
+# It uses +crossplane-cli artifact so the CLI install is cached.
+e2e-run:
   ARG TARGETARCH
   ARG TARGETOS
   ARG GOARCH=${TARGETARCH}
@@ -168,68 +176,66 @@ test-e2e:
   COPY --dir examples/ tests/ ./
   RUN chmod +x tests/e2e/scripts/gen-invalid-tests.sh tests/e2e/scripts/run.sh
   WITH DOCKER
-    RUN CROSSPLANE_VERSION=${CROSSPLANE_VERSION} /tests/e2e/scripts/run.sh
+    RUN /tests/e2e/scripts/run.sh
   END
 
-# test-e2e-v1 runs tests against Crossplane v1.
-test-e2e-v1:
-  BUILD --build-arg CROSSPLANE_VERSION=$E2E_CROSSPLANE_V1 +test-e2e
+# e2e-v1 runs e2e tests against Crossplane v1.
+e2e-v1:
+  BUILD --build-arg CROSSPLANE_VERSION=$E2E_CROSSPLANE_V1 +e2e-run
 
-# test-e2e-v2 runs tests against Crossplane v2.
-test-e2e-v2:
-  BUILD --build-arg CROSSPLANE_VERSION=$E2E_CROSSPLANE_V2 +test-e2e
+# e2e-v2 runs e2e tests against Crossplane v2.
+e2e-v2:
+  BUILD --build-arg CROSSPLANE_VERSION=$E2E_CROSSPLANE_V2 +e2e-run
 
-# test-e2e-all runs the e2e tests against v1 and v2 (sequential; for local use; CI uses matrix jobs).
-test-e2e-all:
-  BUILD +test-e2e-v1
-  BUILD +test-e2e-v2
-
-# regen-e2e-expected-v1 runs the regen script for Crossplane v1 only; used in parallel with v2 then merged.
-regen-e2e-expected-v1:
-  ARG TARGETARCH
-  ARG TARGETOS
-  ARG GOARCH=${TARGETARCH}
-  ARG GOOS=${TARGETOS}
-  FROM earthly/dind:alpine-3.20-docker-26.1.5-r0
-  COPY (+crossplane-cli/crossplane --CROSSPLANE_VERSION=${E2E_CROSSPLANE_V1}) /usr/local/bin/crossplane
-  RUN apk add --no-cache bash
-  COPY +go-build/xprin .
-  COPY --dir examples/ tests/e2e/scripts/ ./
-  RUN chmod +x scripts/gen-invalid-tests.sh scripts/regen-expected.sh
-  RUN mkdir expected
-  WITH DOCKER
-    RUN CROSSPLANE_V1=/usr/local/bin/crossplane scripts/regen-expected.sh v1
-  END
-  SAVE ARTIFACT expected
-
-# regen-e2e-expected-v2 runs the regen script for Crossplane v2 only; used in parallel with v1 then merged.
-regen-e2e-expected-v2:
-  ARG TARGETARCH
-  ARG TARGETOS
-  ARG GOARCH=${TARGETARCH}
-  ARG GOOS=${TARGETOS}
-  FROM earthly/dind:alpine-3.20-docker-26.1.5-r0
-  COPY (+crossplane-cli/crossplane --CROSSPLANE_VERSION=${E2E_CROSSPLANE_V2}) /usr/local/bin/crossplane
-  RUN apk add --no-cache bash
-  COPY +go-build/xprin .
-  COPY --dir examples/ tests/e2e/scripts/ ./
-  RUN chmod +x scripts/gen-invalid-tests.sh scripts/regen-expected.sh
-  RUN mkdir expected
-  WITH DOCKER
-    RUN CROSSPLANE_V2=/usr/local/bin/crossplane scripts/regen-expected.sh v2
-  END
-  SAVE ARTIFACT expected
-
-# regen-e2e-expected runs v1 and v2 in parallel, merges artifacts, runs cleanup, then exports.
-regen-e2e-expected:
-  BUILD +regen-e2e-expected-v1
-  BUILD +regen-e2e-expected-v2
+# e2e-regen-expected runs v1 and v2 in parallel, merges artifacts, runs cleanup, then exports.
+e2e-regen-expected:
+  BUILD +e2e-regen-expected-v1
+  BUILD +e2e-regen-expected-v2
   FROM alpine:3.20
   RUN apk add --no-cache bash
   WORKDIR /work
-  COPY +regen-e2e-expected-v1/expected expected/
-  COPY +regen-e2e-expected-v2/expected expected/
+  COPY +e2e-regen-expected-v1/expected v1-expected/
+  COPY +e2e-regen-expected-v2/expected v2-expected/
+  RUN mkdir -p expected && cp -a v1-expected/. expected/ && cp -a v2-expected/. expected/
   COPY --dir tests/e2e/scripts/ ./
   RUN chmod +x scripts/regen-expected.sh
-  RUN scripts/regen-expected.sh cleanup
+  RUN CLEANUP=true scripts/regen-expected.sh
   SAVE ARTIFACT expected AS LOCAL tests/e2e/expected
+
+# e2e-regen-expected-v1 runs the regen script for Crossplane v1 only; used in parallel with v2 then merged.
+# Full target (not BUILD-only) so COPY +e2e-regen-expected-v1/expected works in e2e-regen-expected.
+e2e-regen-expected-v1:
+  ARG TARGETARCH
+  ARG TARGETOS
+  ARG GOARCH=${TARGETARCH}
+  ARG GOOS=${TARGETOS}
+  FROM earthly/dind:alpine-3.20-docker-26.1.5-r0
+  COPY (+crossplane-cli/crossplane --CROSSPLANE_VERSION=$E2E_CROSSPLANE_V1) /usr/local/bin/crossplane
+  RUN apk add --no-cache bash
+  COPY +go-build/xprin .
+  COPY --dir examples/ tests/e2e/scripts/ ./
+  RUN chmod +x scripts/gen-invalid-tests.sh scripts/regen-expected.sh
+  RUN mkdir expected
+  WITH DOCKER
+    RUN GENERATE=true scripts/regen-expected.sh
+  END
+  SAVE ARTIFACT expected
+
+# e2e-regen-expected-v2 runs the regen script for Crossplane v2 only; used in parallel with v1 then merged.
+e2e-regen-expected-v2:
+  ARG TARGETARCH
+  ARG TARGETOS
+  ARG GOARCH=${TARGETARCH}
+  ARG GOOS=${TARGETOS}
+  FROM earthly/dind:alpine-3.20-docker-26.1.5-r0
+  COPY (+crossplane-cli/crossplane --CROSSPLANE_VERSION=$E2E_CROSSPLANE_V2) /usr/local/bin/crossplane
+  RUN apk add --no-cache bash
+  COPY +go-build/xprin .
+  COPY --dir examples/ tests/e2e/scripts/ ./
+  RUN chmod +x scripts/gen-invalid-tests.sh scripts/regen-expected.sh
+  RUN mkdir expected
+  WITH DOCKER
+    RUN GENERATE=true scripts/regen-expected.sh
+  END
+  SAVE ARTIFACT expected
+

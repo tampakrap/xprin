@@ -15,50 +15,39 @@ STATUS=0
 
 cd "${PROJECT_ROOT}"
 
+# Detect Crossplane major version (1 or 2) from binary - same logic as regen-expected.sh
+xp_major_from_binary() {
+    local bin="$1"
+    local ver
+    ver="$("${bin}" version --client 2>/dev/null | cut -d':' -f2 | xargs || true)"
+    if [[ "${ver}" == v1.* ]]; then
+        echo 1
+    elif [[ "${ver}" == v2.* ]]; then
+        echo 2
+    else
+        echo 2
+    fi
+}
+
 if [ ! -f "${TESTCASES_FILE}" ]; then
     echo "Test case list not found: ${TESTCASES_FILE}"
     exit 1
 fi
-
-# Ensure xprin binary exists
 if [ ! -x "${XPRIN_BIN}" ]; then
     echo "xprin binary not found or not executable: ${XPRIN_BIN}"
     echo "Run: make xprin-build"
+    exit 1
+fi
+if [ ! -f "${NORMALIZE_SCRIPT}" ]; then
+    echo "Normalize script not found: ${NORMALIZE_SCRIPT}"
     exit 1
 fi
 
 # shellcheck source=/dev/null
 source "${TESTCASES_FILE}"
 
-if [ ! -f "${NORMALIZE_SCRIPT}" ]; then
-    echo "Normalize script not found: ${NORMALIZE_SCRIPT}"
-    exit 1
-fi
-
-# Resolve Crossplane major version (1 or 2) for version-specific expected output.
-# Prefer CROSSPLANE_VERSION env (set by Earthly); otherwise detect from crossplane CLI.
-if [ -n "${CROSSPLANE_VERSION:-}" ]; then
-    if [[ "${CROSSPLANE_VERSION}" == v1.* ]]; then
-        XP_MAJOR=1
-    elif [[ "${CROSSPLANE_VERSION}" == v2.* ]]; then
-        XP_MAJOR=2
-    else
-        echo "Unknown CROSSPLANE_VERSION format: ${CROSSPLANE_VERSION}; defaulting to v2"
-        XP_MAJOR=2
-    fi
-else
-    XP_VER="$(crossplane version --client 2>/dev/null | cut -d':' -f2 | xargs || true)"
-    if [[ "${XP_VER}" == v1.* ]]; then
-        XP_MAJOR=1
-    elif [[ "${XP_VER}" == v2.* ]]; then
-        XP_MAJOR=2
-    else
-        echo "Could not detect Crossplane version (crossplane version output: '${XP_VER}'); defaulting to v2"
-        XP_MAJOR=2
-    fi
-fi
-TEST_CASES=($(compgen -v | grep '^testcase_' | grep -v '_exit$' | sort))
-
+XP_MAJOR=$(xp_major_from_binary crossplane)
+TEST_CASES=($(compgen -v | grep '^testcase_' | grep -v '_exit$' | LC_ALL=C sort))
 if [ "${#TEST_CASES[@]}" -eq 0 ]; then
     echo "No test cases defined in ${TESTCASES_FILE}"
     exit 1
@@ -70,6 +59,7 @@ FAILED_TESTS=()
 TMPDIRS=()
 
 export E2E_TESTS_DIR
+
 # Set trap before generating so we clean up on any exit (including script failure).
 trap 'for d in "${TMPDIRS[@]}"; do rm -rf "${d}"; done; rm -f "${E2E_TESTS_DIR}"/generated_*.yaml' EXIT
 
