@@ -281,7 +281,7 @@ DEBUG: Using provided XR file: /var/folders/st/_skftlwn3bb8z_vk249n6qy80000gn/T/
 DEBUG: Running render command: crossplane render --include-full-xr ...
 DEBUG: Wrote rendered output to: /var/folders/st/_skftlwn3bb8z_vk249n6qy80000gn/T/xprin-testcase-371846768/outputs/rendered.yaml
 DEBUG: Running validate command: crossplane beta validate --error-on-missing-schemas ...
-DEBUG: Wrote validation output to: /var/folders/st/_skftlwn3bb8z_vk249n6qy80000gn/T/xprin-testcase-371846768/outputs/validate.yaml
+DEBUG: Wrote validation output to: /var/folders/st/_skftlwn3bb8z_vk249n6qy80000gn/T/xprin-testcase-371846768/outputs/validate.txt
 DEBUG: Test case 'Initial reconciliation loop (runs both render and validate)' completed with status: PASS
 ok	examples/mytests/1_simple_tests/example3_validate_xprin.yaml	1.572s
 ```
@@ -550,6 +550,7 @@ In this example, we use post-test hooks to:
 - Inspect the XR status from the rendered output using `{{ .Outputs.XR }}`
 - Display render count using `{{ .Outputs.RenderCount }}`
 - Show the render output file path using `{{ .Outputs.Render }}`
+- Show the assertions output path using `{{ .Outputs.Assertions }}`
 - Access specific rendered resources using `{{ index .Outputs.Rendered "SecurityGroup/platform-aws-sg" }}`
 - Compare input and output XRs using `dyff` with both `{{ .Inputs.XR }}` and `{{ .Outputs.XR }}`
 

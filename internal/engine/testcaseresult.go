@@ -57,8 +57,9 @@ type TestCaseResult struct {
 	StartTime time.Time
 
 	// Raw outputs (stored by runner)
-	RawRenderOutput   []byte
-	RawValidateOutput []byte
+	RawRenderOutput     []byte
+	RawValidateOutput   []byte
+	RawAssertionsOutput string // Full assertion text, no indentation (from AssertionsResults)
 
 	// Parsed render resources (parsed once, used many times)
 	RenderedResources []*unstructured.Unstructured
@@ -114,7 +115,8 @@ func NewTestCaseResult(name, id string, verbose, showRender, showValidate, showH
 type Outputs struct {
 	Render      string            // Path to rendered.yaml
 	XR          string            // Path to xr.yaml
-	Validate    *string           // Path to validate.yaml (nil if no CRDs)
+	Validate    *string           // Path to validate.txt (nil if no CRDs)
+	Assertions  *string           // Path to assertions.txt (nil if no assertions)
 	RenderCount int               // Number of resources in render output
 	Rendered    map[string]string // Kind/Name -> file path for individual rendered resources
 }
@@ -164,9 +166,10 @@ func (tcr *TestCaseResult) MarkValidateFailed() error {
 
 // MarkAssertionsFailed marks the test as having failed assertions and returns the formatted error.
 // Callers should then call Fail() with this error to mark the test as failed.
+// ProcessAssertionsOutput must have been called first so FormattedAssertionsOutput is set.
 func (tcr *TestCaseResult) MarkAssertionsFailed() error {
 	tcr.HasFailedAssertions = true
-	return fmt.Errorf("%s", tcr.formatAssertionsOutput())
+	return fmt.Errorf("%s", tcr.FormattedAssertionsOutput)
 }
 
 // Print prints the test case result to the given writer.
@@ -404,18 +407,14 @@ func (tcr *TestCaseResult) formatHooksOutputWithShow(hooksResults []HookResult, 
 	return strings.Join(out, "\n") + "\n"
 }
 
-// formatAssertionsOutput formats assertion results for display for the assertions section.
-// Returns "" when the section would not be shown (!hasFailedAssertions && !(Verbose && ShowAssertions)).
-// Otherwise returns either all assertions or only failed, based on hasFailedAssertions, Verbose, and ShowAssertions.
-func (tcr *TestCaseResult) formatAssertionsOutput() string {
+// formatAssertionsOutput builds both raw and formatted assertion output from AssertionsResults.
+// raw: full list, no leading spaces (for assertions.txt, like RawValidateOutput).
+// formatted: display version, possibly filtered, with "    Assertions:" and indented lines; "" when section not shown.
+func (tcr *TestCaseResult) formatAssertionsOutput() (raw, formatted string) {
 	const header = "Assertions:"
 
-	if !tcr.HasFailedAssertions && (!tcr.Verbose || !tcr.ShowAssertions) {
-		return ""
-	}
-
 	if len(tcr.AssertionsResults) == 0 {
-		return ""
+		return "", ""
 	}
 
 	var passCount, failCount, errorCount int
@@ -429,48 +428,59 @@ func (tcr *TestCaseResult) formatAssertionsOutput() string {
 		case StatusError():
 			errorCount++
 		case StatusSkip():
-			// skipped assertions are not counted in pass/fail/error totals
 		default:
-			errorCount++ // backward compatibility for unknown status
-		}
-	}
-
-	toList := tcr.AssertionsResults
-
-	if tcr.HasFailedAssertions && (!tcr.Verbose || !tcr.ShowAssertions) {
-		failedOrError := make([]AssertionResult, 0, failCount+errorCount)
-
-		for _, r := range tcr.AssertionsResults {
-			if r.Status != StatusPass() {
-				failedOrError = append(failedOrError, r)
-			}
-		}
-
-		toList = failedOrError
-		if len(toList) == 0 {
-			return ""
-		}
-	}
-
-	lines := make([]string, 0, 2+len(toList))
-	lines = append(lines, fmt.Sprintf("%s%s", spaces, header))
-
-	for _, r := range toList {
-		if strings.Contains(r.Message, "\n") {
-			lines = append(lines,
-				fmt.Sprintf("%s%s %s", spaces+spaces, r.Status.Symbol, r.Name),
-				indentMultilineBody(multilineBodyIndent, r.Message))
-		} else {
-			lines = append(lines, fmt.Sprintf("%s%s %s - %s", spaces+spaces, r.Status.Symbol, r.Name, r.Message))
+			errorCount++
 		}
 	}
 
 	plural := pluralize.NewClient()
 	errorLabel := plural.Pluralize("error", errorCount, true)
 	totalLine := fmt.Sprintf("Total: %d assertions, %d successful, %d failed, %s", len(tcr.AssertionsResults), passCount, failCount, errorLabel)
-	lines = append(lines, fmt.Sprintf("%s%s", spaces+spaces, totalLine))
 
-	return strings.Join(lines, "\n") + "\n"
+	showFormattedSection := tcr.HasFailedAssertions || (tcr.Verbose && tcr.ShowAssertions)
+	includeAllInFormatted := tcr.Verbose && tcr.ShowAssertions
+
+	rawLines := make([]string, 0, 2+len(tcr.AssertionsResults))
+	rawLines = append(rawLines, header)
+
+	var formattedLines []string
+	if showFormattedSection {
+		formattedLines = make([]string, 0, 2+len(tcr.AssertionsResults))
+	}
+
+	for _, r := range tcr.AssertionsResults {
+		// Raw: always include, no indentation
+		if strings.Contains(r.Message, "\n") {
+			rawLines = append(rawLines,
+				fmt.Sprintf("%s %s", r.Status.Symbol, r.Name),
+				indentMultilineBody(multilineBodyIndent, r.Message))
+		} else {
+			rawLines = append(rawLines, fmt.Sprintf("%s %s - %s", r.Status.Symbol, r.Name, r.Message))
+		}
+		// Formatted: only when section is shown, and include all or only non-pass
+		if showFormattedSection && (includeAllInFormatted || r.Status != StatusPass()) {
+			if strings.Contains(r.Message, "\n") {
+				formattedLines = append(formattedLines,
+					fmt.Sprintf("%s%s %s", spaces+spaces, r.Status.Symbol, r.Name),
+					indentMultilineBody(multilineBodyIndent, r.Message))
+			} else {
+				formattedLines = append(formattedLines, fmt.Sprintf("%s%s %s - %s", spaces+spaces, r.Status.Symbol, r.Name, r.Message))
+			}
+		}
+	}
+
+	rawLines = append(rawLines, totalLine)
+	raw = strings.Join(rawLines, "\n") + "\n"
+
+	if showFormattedSection && len(formattedLines) > 0 {
+		withHeaderAndTotal := make([]string, 0, 2+len(formattedLines))
+		withHeaderAndTotal = append(withHeaderAndTotal, fmt.Sprintf("%s%s", spaces, header))
+		withHeaderAndTotal = append(withHeaderAndTotal, formattedLines...)
+		withHeaderAndTotal = append(withHeaderAndTotal, fmt.Sprintf("%s%s", spaces+spaces, totalLine))
+		formatted = strings.Join(withHeaderAndTotal, "\n") + "\n"
+	}
+
+	return raw, formatted
 }
 
 // parseRenderOutput parses the raw render output and returns the resources.
@@ -552,8 +562,7 @@ func (tcr *TestCaseResult) ProcessPostTestHooksOutput() {
 	tcr.FormattedPostTestHooksOutput = tcr.formatHooksOutput("post-test")
 }
 
-// ProcessAssertionsOutput formats the assertion results and sets hasFailedAssertions.
-// It sets FormattedAssertionsOutput to the single string that will be printed (all or failed-only, or "" when section not shown).
+// ProcessAssertionsOutput sets HasFailedAssertions and, from AssertionsResults, both RawAssertionsOutput and FormattedAssertionsOutput.
 func (tcr *TestCaseResult) ProcessAssertionsOutput() {
 	if len(tcr.AssertionsResults) == 0 {
 		return
@@ -567,5 +576,5 @@ func (tcr *TestCaseResult) ProcessAssertionsOutput() {
 		}
 	}
 
-	tcr.FormattedAssertionsOutput = tcr.formatAssertionsOutput()
+	tcr.RawAssertionsOutput, tcr.FormattedAssertionsOutput = tcr.formatAssertionsOutput()
 }

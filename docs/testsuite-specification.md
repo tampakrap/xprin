@@ -250,7 +250,8 @@ Available in hooks and other test case fields:
 Available in post-test hooks only:
 - `{{ .Outputs.XR }}` - XR file path
 - `{{ .Outputs.Render }}` - Full rendered output path
-- `{{ .Outputs.Validate }}` - Validation output path
+- `{{ .Outputs.Validate }}` - Raw validate output path
+- `{{ .Outputs.Assertions }}` - Assertions output path (assertions.txt; nil if no assertions)
 - `{{ .Outputs.RenderCount }}` - Number of rendered resources
 - `{{ index .Outputs.Rendered "Kind/Name" }}` - Individual resource paths
 
@@ -259,6 +260,7 @@ Available when test has `id` field:
 - `{{ .Tests.{test-id}.Outputs.XR }}` - XR from referenced test
 - `{{ .Tests.{test-id}.Outputs.Render }}` - Render output from referenced test
 - `{{ .Tests.{test-id}.Outputs.Validate }}` - Validate output from referenced test
+- `{{ .Tests.{test-id}.Outputs.Assertions }}` - Assertions output from referenced test
 - `{{ .Tests.{test-id}.Outputs.RenderCount }}` - Render count from referenced test
 - `{{ index .Tests.{test-id}.Outputs.Rendered "Kind/Name" }}` - Individual resource from referenced test
 
