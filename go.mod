@@ -8,7 +8,7 @@ require (
 	github.com/crossplane/crossplane-runtime/v2 v2.1.0
 	github.com/crossplane/crossplane/v2 v2.1.3
 	github.com/gertd/go-pluralize v0.2.1
-	github.com/go-git/go-git/v5 v5.16.3
+	github.com/go-git/go-git/v5 v5.16.5
 	github.com/gonvenience/bunt v1.4.2
 	github.com/gonvenience/ytbx v1.4.7
 	github.com/google/go-cmp v0.7.0
