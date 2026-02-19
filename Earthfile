@@ -31,7 +31,8 @@ build:
 
 # multiplatform-build builds xprin for all supported OS and architectures.
 multiplatform-build:
-  BUILD +go-multiplatform-build
+  ARG RELEASE_ARTIFACTS=false
+  BUILD +go-multiplatform-build --RELEASE_ARTIFACTS=${RELEASE_ARTIFACTS}
 
 # generate runs code generation. To keep builds fast, it doesn't run as part of
 # the build target. It's important to run it explicitly when code needs to be
@@ -81,6 +82,7 @@ go-generate:
   SAVE ARTIFACT data AS LOCAL data
 
 # go-build builds xprin binaries for your native OS and architecture.
+# Set RELEASE_ARTIFACTS=true to output flat release-ready artifacts to _output/release/
 go-build:
   ARG EARTHLY_GIT_SHORT_HASH
   ARG EARTHLY_GIT_COMMIT_TIMESTAMP
@@ -91,6 +93,7 @@ go-build:
   ARG GOOS=${TARGETOS}
   ARG LDFLAGS="-s -w -X=github.com/crossplane-contrib/xprin/internal/version.version=${XPRIN_VERSION}"
   ARG CGO_ENABLED=0
+  ARG RELEASE_ARTIFACTS=false
   FROM +go-modules
   LET ext = ""
   IF [ "$GOOS" = "windows" ]
@@ -106,18 +109,32 @@ go-build:
   RUN sha256sum xprin.tar.gz | head -c 64 > xprin.tar.gz.sha256
   RUN tar -czvf xprin-helpers.tar.gz xprin-helpers${ext} xprin-helpers${ext}.sha256
   RUN sha256sum xprin-helpers.tar.gz | head -c 64 > xprin-helpers.tar.gz.sha256
-  SAVE ARTIFACT --keep-ts xprin${ext} AS LOCAL _output/bin/${GOOS}_${GOARCH}/xprin${ext}
-  SAVE ARTIFACT --keep-ts xprin${ext}.sha256 AS LOCAL _output/bin/${GOOS}_${GOARCH}/xprin${ext}.sha256
-  SAVE ARTIFACT --keep-ts xprin.tar.gz AS LOCAL _output/bundle/${GOOS}_${GOARCH}/xprin.tar.gz
-  SAVE ARTIFACT --keep-ts xprin.tar.gz.sha256 AS LOCAL _output/bundle/${GOOS}_${GOARCH}/xprin.tar.gz.sha256
-  SAVE ARTIFACT --keep-ts xprin-helpers${ext} AS LOCAL _output/bin/${GOOS}_${GOARCH}/xprin-helpers${ext}
-  SAVE ARTIFACT --keep-ts xprin-helpers${ext}.sha256 AS LOCAL _output/bin/${GOOS}_${GOARCH}/xprin-helpers${ext}.sha256
-  SAVE ARTIFACT --keep-ts xprin-helpers.tar.gz AS LOCAL _output/bundle/${GOOS}_${GOARCH}/xprin-helpers.tar.gz
-  SAVE ARTIFACT --keep-ts xprin-helpers.tar.gz.sha256 AS LOCAL _output/bundle/${GOOS}_${GOARCH}/xprin-helpers.tar.gz.sha256
+  IF [ "$RELEASE_ARTIFACTS" = "true" ]
+    # Flat structure with arch suffix for releases: _output/release/xprin_linux_amd64
+    SAVE ARTIFACT --keep-ts xprin${ext} AS LOCAL _output/release/xprin_${GOOS}_${GOARCH}${ext}
+    SAVE ARTIFACT --keep-ts xprin${ext}.sha256 AS LOCAL _output/release/xprin_${GOOS}_${GOARCH}${ext}.sha256
+    SAVE ARTIFACT --keep-ts xprin.tar.gz AS LOCAL _output/release/xprin_${GOOS}_${GOARCH}.tar.gz
+    SAVE ARTIFACT --keep-ts xprin.tar.gz.sha256 AS LOCAL _output/release/xprin_${GOOS}_${GOARCH}.tar.gz.sha256
+    SAVE ARTIFACT --keep-ts xprin-helpers${ext} AS LOCAL _output/release/xprin-helpers_${GOOS}_${GOARCH}${ext}
+    SAVE ARTIFACT --keep-ts xprin-helpers${ext}.sha256 AS LOCAL _output/release/xprin-helpers_${GOOS}_${GOARCH}${ext}.sha256
+    SAVE ARTIFACT --keep-ts xprin-helpers.tar.gz AS LOCAL _output/release/xprin-helpers_${GOOS}_${GOARCH}.tar.gz
+    SAVE ARTIFACT --keep-ts xprin-helpers.tar.gz.sha256 AS LOCAL _output/release/xprin-helpers_${GOOS}_${GOARCH}.tar.gz.sha256
+  ELSE
+    # Nested structure for local development: _output/bin/linux_amd64/xprin
+    SAVE ARTIFACT --keep-ts xprin${ext} AS LOCAL _output/bin/${GOOS}_${GOARCH}/xprin${ext}
+    SAVE ARTIFACT --keep-ts xprin${ext}.sha256 AS LOCAL _output/bin/${GOOS}_${GOARCH}/xprin${ext}.sha256
+    SAVE ARTIFACT --keep-ts xprin.tar.gz AS LOCAL _output/bundle/${GOOS}_${GOARCH}/xprin.tar.gz
+    SAVE ARTIFACT --keep-ts xprin.tar.gz.sha256 AS LOCAL _output/bundle/${GOOS}_${GOARCH}/xprin.tar.gz.sha256
+    SAVE ARTIFACT --keep-ts xprin-helpers${ext} AS LOCAL _output/bin/${GOOS}_${GOARCH}/xprin-helpers${ext}
+    SAVE ARTIFACT --keep-ts xprin-helpers${ext}.sha256 AS LOCAL _output/bin/${GOOS}_${GOARCH}/xprin-helpers${ext}.sha256
+    SAVE ARTIFACT --keep-ts xprin-helpers.tar.gz AS LOCAL _output/bundle/${GOOS}_${GOARCH}/xprin-helpers.tar.gz
+    SAVE ARTIFACT --keep-ts xprin-helpers.tar.gz.sha256 AS LOCAL _output/bundle/${GOOS}_${GOARCH}/xprin-helpers.tar.gz.sha256
+  END
 
 # go-multiplatform-build builds xprin binaries for all supported OS
 # and architectures.
 go-multiplatform-build:
+  ARG RELEASE_ARTIFACTS=false
   BUILD \
     --platform=linux/amd64 \
     --platform=linux/arm64 \
@@ -126,7 +143,7 @@ go-multiplatform-build:
     --platform=darwin/arm64 \
     --platform=darwin/amd64 \
     --platform=windows/amd64 \
-    +go-build
+    +go-build --RELEASE_ARTIFACTS=${RELEASE_ARTIFACTS}
 
 # go-test runs Go unit tests.
 go-test:
