@@ -17,12 +17,14 @@ limitations under the License.
 package discovery
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/crossplane-contrib/xprin/internal/api"
 	"github.com/crossplane-contrib/xprin/internal/placeholder"
+	"github.com/crossplane-contrib/xprin/internal/templates"
 	"github.com/crossplane-contrib/xprin/internal/utils"
 	"github.com/spf13/afero"
 	"sigs.k8s.io/yaml"
@@ -67,5 +69,28 @@ func Load(fs afero.Fs, testSuiteFile string, options Options) (*api.TestSuiteSpe
 		return nil, ReportTestSuiteError(testSuiteFile, err, failureInvalid)
 	}
 
+	// Report the templates that don't parse now, not when the test case that has them runs
+	if err := checkTemplates(&testSuiteSpec); err != nil {
+		return nil, ReportTestSuiteError(testSuiteFile, err, failureInvalid)
+	}
+
 	return &testSuiteSpec, nil
+}
+
+// checkTemplates parses every template of the testsuite file (the strings that have template
+// variables), and returns an error for each one that doesn't parse, with where it is.
+func checkTemplates(spec *api.TestSuiteSpec) error {
+	var errs []error
+
+	templates.WalkStrings(spec, func(path, s string) {
+		if !strings.Contains(s, placeholder.Open) {
+			return
+		}
+
+		if _, err := templates.Parse(path, placeholder.Restore(s)); err != nil {
+			errs = append(errs, err)
+		}
+	})
+
+	return errors.Join(errs...)
 }

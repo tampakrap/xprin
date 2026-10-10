@@ -259,6 +259,61 @@ func TestLoad(t *testing.T) {
 		assert.Equal(t, "one", spec.Tests[0].Name)
 	})
 
+	t.Run("a template that doesn't parse is reported where it is, before anything runs", func(t *testing.T) {
+		content := `common:
+  hooks:
+    pre-test:
+    - run: "echo {{ .Inputs.XR }}"
+tests:
+- name: one
+  id: one
+  inputs:
+    xr: xr.yaml
+- name: two
+  inputs:
+    xr: "{{ if .Tests.one.Outputs.XR }}"
+  hooks:
+    post-test:
+    - run: "echo {{ nope .Outputs.XR }}"
+`
+
+		var (
+			spec *api.TestSuiteSpec
+			err  error
+		)
+
+		out := unittestsUtils.CaptureStderr(func() {
+			spec, err = Load(write(t, content), "/a_xprin.yaml", Options{})
+		})
+
+		require.Error(t, err)
+		assert.Nil(t, spec)
+		assert.Contains(t, err.Error(), "tests[1].inputs.xr")
+		assert.Contains(t, err.Error(), "tests[1].hooks.post-test[0].run")
+		assert.NotContains(t, err.Error(), "common.hooks", "valid templates are not reported")
+		assert.Contains(t, out, "FAIL\t/a_xprin.yaml\t[invalid testsuite file]")
+	})
+
+	t.Run("valid templates are accepted", func(t *testing.T) {
+		content := `common:
+  hooks:
+    pre-test:
+    - run: "echo {{ .Inputs.XR }}"
+tests:
+- name: one
+  id: one
+  inputs:
+    xr: xr.yaml
+- name: two
+  inputs:
+    xr: '{{ (index .Tests "one").Outputs.XR }}'
+`
+
+		spec, err := Load(write(t, content), "/a_xprin.yaml", Options{})
+		require.NoError(t, err)
+		require.NotNil(t, spec)
+	})
+
 	t.Run("a file without test cases is reported, and is not an error", func(t *testing.T) {
 		var (
 			spec *api.TestSuiteSpec

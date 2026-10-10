@@ -385,6 +385,7 @@ Template variables use Go's `text/template` package for dynamic content.
 
 - **Input Expansion**: Happens during setup phase, before file copying
 - **Hook Expansion**: Happens when hooks are executed (pre-test or post-test)
+- **Syntax Check**: Every template is parsed when the testsuite file is loaded, so a syntax error (or a function that doesn't exist) is reported for the file, with where it is (for example `tests[1].inputs.xr`), before any of its test cases run
 
 ### Available Variables
 
