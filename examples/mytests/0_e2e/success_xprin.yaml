@@ -65,3 +65,20 @@ tests:
     xrd: ../../aws/xrd.yaml
   inputs:
     xr: ../../aws/xr_without_team.yaml
+
+# update-goldens renders a test case without golden files when another one needs it: it would have no outputs
+# for the one that uses them, which has golden files that update-goldens writes
+- name: "Needed by another test case, and has no golden files"
+  id: golden_base
+  inputs:
+    xr: ../../aws/xr.yaml
+
+- name: "Needs it and uses its outputs, with a golden file"
+  needs:
+  - golden_base
+  inputs:
+    xr: '{{ .Tests.golden_base.Outputs.XR }}'
+  assertions:
+    diff:
+    - name: "Full render matches golden"
+      expected: golden_full_render.yaml

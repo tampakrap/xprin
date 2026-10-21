@@ -156,15 +156,16 @@ func (g *Graph) Nodes() []Node {
 	return g.nodes
 }
 
-// NodeByID returns what the graph knows about the testcase with this ID, and false when no testcase has it. A
-// testcase without an ID can't be found this way, and when several have the same ID, it is the first one.
-func (g *Graph) NodeByID(id string) (Node, bool) {
+// NodeByID returns what the graph knows about the testcase with this ID, or the zero Node when no testcase has it:
+// a node that was found always has an ID. A testcase without an ID can't be found this way, and when several have
+// the same ID, it is the first one.
+func (g *Graph) NodeByID(id string) Node {
 	i, found := g.byID[id]
 	if !found {
-		return Node{}, false
+		return Node{}
 	}
 
-	return g.nodes[i], true
+	return g.nodes[i]
 }
 
 // DependenciesOf returns the positions of the testcases that the testcase at position i needs, in ascending order

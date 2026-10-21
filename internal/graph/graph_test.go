@@ -186,29 +186,23 @@ func TestNodeByID(t *testing.T) {
 	}})
 
 	t.Run("the testcase with that ID", func(t *testing.T) {
-		node, found := g.NodeByID("b")
+		node := g.NodeByID("b")
 
-		require.True(t, found)
+		assert.Equal(t, "b", node.ID)
 		assert.Equal(t, 2, node.Position)
 		assert.Equal(t, []int{0}, node.Needs)
 	})
 
-	t.Run("none has it", func(t *testing.T) {
-		_, found := g.NodeByID("missing")
-
-		assert.False(t, found)
+	t.Run("none has it: the zero Node", func(t *testing.T) {
+		assert.Equal(t, Node{}, g.NodeByID("missing"))
 	})
 
 	t.Run("a testcase without an ID can't be found", func(t *testing.T) {
-		_, found := g.NodeByID("")
-
-		assert.False(t, found)
+		assert.Equal(t, Node{}, g.NodeByID(""))
 	})
 
 	t.Run("several have it: the first", func(t *testing.T) {
-		node, _ := g.NodeByID("b")
-
-		assert.Equal(t, "b", node.Name)
+		assert.Equal(t, "b", g.NodeByID("b").Name)
 	})
 }
 
