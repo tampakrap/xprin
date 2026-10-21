@@ -25,12 +25,39 @@ import (
 	"github.com/crossplane-contrib/xprin/internal/api"
 )
 
-// Graph records, for each testcase of a testsuite file, the testcases that it needs.
+// Node is what the graph knows about one testcase of a testsuite file. Every position is the one of a testcase in
+// the file, and every list is in ascending order and has each position once. The lists belong to the graph: they
+// must not be changed.
+type Node struct {
+	// Position, Name and ID are the ones of the testcase. ID is empty when it has none.
+	Position int
+	Name     string
+	ID       string
+
+	// Needs are the testcases that it lists in its `needs`.
+	Needs []int
+	// NeedsIndirectly are the ones it needs through the testcases it needs, and doesn't list: if third needs
+	// second, and second needs first, third needs first indirectly.
+	NeedsIndirectly []int
+	// NeededBy are the testcases that list it in their `needs`.
+	NeededBy []int
+	// NeededByIndirectly are the ones that need it through other testcases, and don't list it.
+	NeededByIndirectly []int
+
+	// HasGoldens tells if the testcase has golden-file assertions (assertions.diff or assertions.dyff).
+	HasGoldens bool
+	// NeededForGoldens tells if a golden file depends on the testcase: it has golden-file assertions, or a
+	// testcase that has them needs it, directly or not. When it is false, nothing is lost by not running it to
+	// write golden files.
+	NeededForGoldens bool
+}
+
+// Graph records, for each testcase of a testsuite file, what is known about it and the testcases that it needs.
 type Graph struct {
-	// deps[i] are the testcases that testcase i needs, as their positions in the file (ascending, once each).
-	deps [][]int
-	// ids[i] is the ID of the testcase at position i of the file, empty when it has none.
-	ids []string
+	// nodes[i] is the testcase at position i of the file.
+	nodes []Node
+	// byID[id] is the position of the testcase with that ID, the first one if several have it.
+	byID map[string]int
 	// order is the positions of the testcases in the order they run. CheckCycles sets it, when it finds no cycles
 	order []int
 }
@@ -39,30 +66,111 @@ type Graph struct {
 // that it lists in `needs`. A `needs` that points to no testcase (an ID that doesn't exist) is not a
 // dependency: the testsuite file is rejected when it is loaded, before it gets here.
 func Build(spec *api.TestSuiteSpec) *Graph {
-	g := &Graph{deps: make([][]int, len(spec.Tests)), ids: make([]string, len(spec.Tests))}
+	g := &Graph{nodes: make([]Node, len(spec.Tests)), byID: make(map[string]int)}
 
-	// Turn the IDs in the `needs` of each testcase into positions
+	// What each testcase says: the IDs in its `needs` become positions
 	for i, testCase := range spec.Tests {
-		g.ids[i] = testCase.ID
+		node := &g.nodes[i]
+		node.Position, node.Name, node.ID = i, testCase.Name, testCase.ID
+		node.HasGoldens = testCase.HasAssertionsGoldenFiles()
+
+		if _, seen := g.byID[testCase.ID]; testCase.ID != "" && !seen {
+			g.byID[testCase.ID] = i
+		}
 
 		for _, need := range testCase.Needs {
 			if j := spec.PositionOf(need); j >= 0 {
-				g.deps[i] = append(g.deps[i], j)
+				node.Needs = append(node.Needs, j)
 			}
 		}
 
 		// In order, and once each: the `needs` can list the same testcase twice
-		slices.Sort(g.deps[i])
-		g.deps[i] = slices.Compact(g.deps[i])
+		slices.Sort(node.Needs)
+		node.Needs = slices.Compact(node.Needs)
+	}
+
+	// The reverse of the needs: i goes in order, so each list is in order
+	for i, node := range g.nodes {
+		for _, j := range node.Needs {
+			g.nodes[j].NeededBy = append(g.nodes[j].NeededBy, i)
+		}
+	}
+
+	// What follows from the needs, in both directions
+	for i := range g.nodes {
+		node := &g.nodes[i]
+
+		node.NeedsIndirectly = without(g.reach(i, func(n Node) []int { return n.Needs }), node.Needs)
+		neededByAll := g.reach(i, func(n Node) []int { return n.NeededBy })
+		node.NeededByIndirectly = without(neededByAll, node.NeededBy)
+
+		node.NeededForGoldens = node.HasGoldens || slices.ContainsFunc(neededByAll, func(j int) bool { return g.nodes[j].HasGoldens })
 	}
 
 	return g
 }
 
+// reach returns the positions that can be reached from the testcase at position start by following edges, one
+// testcase after the other, in ascending order. start is not one of them, also when the edges lead back to it.
+func (g *Graph) reach(start int, edges func(Node) []int) []int {
+	seen := make([]bool, len(g.nodes))
+	seen[start] = true
+	pending := []int{start}
+
+	var reached []int
+
+	for len(pending) > 0 {
+		i := pending[len(pending)-1]
+		pending = pending[:len(pending)-1]
+
+		for _, j := range edges(g.nodes[i]) {
+			if !seen[j] {
+				seen[j] = true
+				reached = append(reached, j)
+				pending = append(pending, j)
+			}
+		}
+	}
+
+	slices.Sort(reached)
+
+	return reached
+}
+
+// without returns the positions of all that are not in some, in the same order.
+func without(all, some []int) []int {
+	var rest []int
+
+	for _, i := range all {
+		if !slices.Contains(some, i) {
+			rest = append(rest, i)
+		}
+	}
+
+	return rest
+}
+
+// Nodes returns what the graph knows about each testcase, by position in the file. The list belongs to the graph:
+// it must not be changed.
+func (g *Graph) Nodes() []Node {
+	return g.nodes
+}
+
+// NodeByID returns what the graph knows about the testcase with this ID, and false when no testcase has it. A
+// testcase without an ID can't be found this way, and when several have the same ID, it is the first one.
+func (g *Graph) NodeByID(id string) (Node, bool) {
+	i, found := g.byID[id]
+	if !found {
+		return Node{}, false
+	}
+
+	return g.nodes[i], true
+}
+
 // DependenciesOf returns the positions of the testcases that the testcase at position i needs, in ascending order
 // and once each. The list belongs to the graph: it must not be changed.
 func (g *Graph) DependenciesOf(i int) []int {
-	return g.deps[i]
+	return g.nodes[i].Needs
 }
 
 // GetOrder returns the positions of the testcases in the order they run: each one after the testcases it
@@ -89,7 +197,7 @@ func (g *Graph) CheckCycles() []string {
 	var cycles []string
 
 	// done marks the testcases of the cycles found so far: the next sort leaves them out, so it can't find them again
-	done := make([]bool, len(g.deps))
+	done := make([]bool, len(g.nodes))
 
 	for {
 		// Sort what is not done: what can't run is stuck, either in a cycle or waiting behind one
@@ -117,7 +225,7 @@ func (g *Graph) CheckCycles() []string {
 
 // noCyclesLeft tells if every testcase that is not done is in order: nothing is stuck, so no cycle is left to find.
 func (g *Graph) noCyclesLeft(order []int, done []bool) bool {
-	return len(order) == len(g.deps)-count(done)
+	return len(order) == len(g.nodes)-count(done)
 }
 
 // count returns how many of the values are true.
@@ -141,9 +249,9 @@ func (g *Graph) sortByDependencies(done []bool) (order, waiting []int) {
 	isDone := func(i int) bool { return done != nil && done[i] }
 
 	// waiting[i] counts the testcases that testcase i still has to wait for: it can run when it reaches 0
-	waiting = make([]int, len(g.deps))
+	waiting = make([]int, len(g.nodes))
 	// needed[j] lists the testcases that need testcase j: the ones to unblock a little when j has run
-	needed := make([][]int, len(g.deps))
+	needed := make([][]int, len(g.nodes))
 
 	// Example: if B needs A, waiting[B] starts at 1 and needed[A] is [B]. When A runs, waiting[B]
 	// drops to 0 and B can run.
@@ -152,7 +260,9 @@ func (g *Graph) sortByDependencies(done []bool) (order, waiting []int) {
 	var ready []int
 
 	// Setup: count what each testcase waits for, note who needs it, and mark the ones that wait for nothing
-	for i, deps := range g.deps {
+	for i, node := range g.nodes {
+		deps := node.Needs
+
 		// A testcase that is done is left out
 		if isDone(i) {
 			continue
@@ -213,7 +323,7 @@ func (g *Graph) findCycle(waiting []int) []int {
 		path = append(path, i)
 
 		// Go on to the first of its needs that is also stuck
-		i = g.deps[i][slices.IndexFunc(g.deps[i], func(j int) bool { return waiting[j] > 0 })]
+		i = g.nodes[i].Needs[slices.IndexFunc(g.nodes[i].Needs, func(j int) bool { return waiting[j] > 0 })]
 	}
 }
 
@@ -222,7 +332,7 @@ func (g *Graph) describe(cycle []int) string {
 	labels := make([]string, len(cycle))
 
 	for k, i := range cycle {
-		labels[k] = g.ids[i]
+		labels[k] = g.nodes[i].ID
 		if labels[k] == "" {
 			labels[k] = fmt.Sprintf("test case %d", i+1)
 		}
