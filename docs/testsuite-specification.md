@@ -1,287 +1,181 @@
 # Test Suite Specification
 
-Test suite files define the test cases for xprin. They must be named `xprin.yaml` or `*_xprin.yaml`.
+A test suite file defines test cases for xprin. Its name must be `xprin.yaml` or end with `_xprin.yaml` (see [Discovering Testsuite Files](how-it-works.md#discovering-testsuite-files)). For a complete file, see [Getting Started](getting-started.md) and the [examples](../examples/README.md).
 
-## Basic Structure
+This page describes the format, key by key. The tables are generated from the Go types in `internal/api`; for what xprin does with each key, see [How It Works](how-it-works.md).
+
+## Structure
 
 ```yaml
-common:
-  inputs:
-    xr: /path/to/common-xr.yaml  # or claim: /path/to/common-claim.yaml
-    composition: /path/to/composition.yaml
-    functions: /path/to/functions
-    crds:
-    - ../../path/to/crd_dir
-    - {{ .Repositories.myrepo }}/path/to/crossplane.yaml
-    context-files:
-      key1: /path/to/context1.yaml
-      key2: /path/to/context2.yaml
-    context-values:
-      key1: "value1"
-      key2: "value2"
-    observed-resources: /path/to/observed-resources.yaml
-    extra-resources: /path/to/extra-resources.yaml
-    function-credentials: /path/to/function-credentials.yaml
-  patches:
-    xrd: /path/to/xrd.yaml
-    connection-secret: true
-    connection-secret-name: "my-secret"
-    connection-secret-namespace: "my-namespace"
-  hooks:
-    pre-test:
-    - name: "setup environment"
-      run: "echo 'Setting up test environment'"
-    - name: "another pre-test hook"
-      run: "echo 'Another pre-test action'"
-    post-test:
-    - name: "cleanup"
-      run: "echo 'Cleaning up test artifacts'"
-    - name: "validate common outputs"
-      run: "echo 'Validating {{ .Outputs.XR }}'"
-  assertions:
-    xprin:
-    - name: "common-resource-count"
-      type: "Count"
-      value: 3
-    diff:
-    - name: "Common full render matches golden"
-      expected: common_golden_full_render.yaml
-    dyff:
-    - name: "Common full render matches golden (structural)"
-      expected: common_golden_full_render.yaml
-
-tests:
-- name: "My Test Case"
-  id: "test_case_1"
-  inputs:
-    xr: xr.yaml
-    composition: comp.yaml
-    functions: /path/to/functions
-    crds:
-    - ../../path/to/crd_dir
-    context-files:
-      key1: /path/to/context1.yaml
-    context-values:
-      key1: "value1"
-    observed-resources: /path/to/observed-resources.yaml
-    extra-resources: /path/to/extra-resources.yaml
-    function-credentials: /path/to/function-credentials.yaml
-  patches:
-    xrd: /path/to/xrd.yaml
-    connection-secret: true
-    connection-secret-name: "my-secret"
-    connection-secret-namespace: "my-namespace"
-  hooks:
-    pre-test:
-    - name: "pre-test setup"
-      run: "echo 'Pre-test setup for {{ .Inputs.XR }}'"
-    post-test:
-    - name: "validate outputs"
-      run: "echo 'Validating {{ .Outputs.XR }}'"
-    - name: "check render count"
-      run: "echo 'Rendered {{ .Outputs.RenderCount }} resources'"
-  assertions:
-    xprin:
-    - name: "resource-count"
-      type: "Count"
-      value: 3
-    - name: "deployment-exists"
-      type: "Exists"
-      resource: "Deployment/my-app"
-    - name: "replicas-value"
-      type: "FieldValue"
-      resource: "Deployment/my-app"
-      field: "spec.replicas"
-      operator: "=="
-      value: 3
-    diff:
-    - name: "Full render matches golden"
-      expected: golden_full_render.yaml
-    dyff:
-    - name: "Full render matches golden (structural)"
-      expected: golden_full_render.yaml
-- name: "Test: Basic Setup with Claim"
-  id: "test_case_2"
-  needs:
-  - "test_case_1"
-  inputs:
-    claim: claim.yaml
-    composition: comp.yaml
-    functions: /path/to/functions
-  hooks:
-    pre-test:
-    - name: "use previous test output"
-      run: "echo 'Previous test XR: {{ .Tests.test_case_1.Outputs.XR }}'"
-    post-test:
-    - name: "compare outputs"
-      run: "diff -u {{ .Tests.test_case_1.Outputs.Render }} {{ .Outputs.Render }} || true"
+common:               # Optional: shared by every test case
+  inputs: {}
+  patches: {}
+  hooks: {}
+  assertions: {}
+tests:                # Required
+- name: ""            # Required
+  id: ""
+  needs: []
+  inputs: {}          # Same keys as common
+  patches: {}
+  hooks: {}
+  assertions: {}
 ```
 
-## Field Reference
+## Rules
 
-### Root Level
+- **`common` and test cases are merged.** `inputs`, `patches`, `hooks` and `assertions` can be set in `common`, in a test case, or in both; see [Common vs Test-Level Configuration](how-it-works.md#common-vs-test-level-configuration). A property marked **conditional** in the tables is required in the merged result, so it can come from either.
+- **`xr` or `claim`, not both.** One of them is required, in the test case or in `common`.
+- **`needs` lists the `id`s of other test cases.** A test case can't list itself, the `needs` can't form a cycle, and each one has to be the `id` of a test case in the same file, listed before or after it. A test case that needs another one runs after it, and is skipped if it failed or was skipped. See [Dependencies Between Test Cases](how-it-works.md#dependencies-between-test-cases-needs), and `xprin graph` to see the resulting graph.
+- **Paths** are absolute, relative to the test suite file, or built with template variables (`{{ .Repositories.myrepo }}/...`); see [Path Resolution](how-it-works.md#path-resolution) and [Template Variable Expansion](how-it-works.md#template-variable-expansion).
+- **Hooks** are shell commands that run before (`pre-test`) and after (`post-test`) the test case; see [Hooks Execution](how-it-works.md#hooks-execution).
+- **Assertions** are grouped by engine (`xprin`, `diff`, `dyff`); see [Assertions](assertions.md).
 
-| Field | Required | Type | Description |
-|-------|----------|------|-------------|
-| `common` | ❌ | map | Shared settings for all tests |
-| `tests` | ✅ | list | List of test cases |
+## Reference
 
-### Common Section
+### root
 
-| Field | Required | Type | Description |
-|-------|----------|------|-------------|
-| `inputs` | ❌ | map | Common inputs for all test cases |
-| `patches` | ❌ | map | Common patches for all test cases |
-| `hooks` | ❌ | map | Common hooks for all test cases |
-| `assertions` | ❌ | map | Common assertions for all test cases (see [Assertions](assertions.md)) |
+The top level of the file.
 
-### Test Case
+<!-- DOCS_START_ROOT -->
 
-| Field | Required | Type | Description |
-|-------|----------|------|-------------|
-| `name` | ✅ | string | Test case name (alphanumeric, underscores, hyphens) |
-| `id` | ❌ | string | Optional unique test case ID (makes the test case available to `needs`, and enables cross-test references) |
-| `needs` | ❌ | list of strings | IDs of the test cases this one depends on, listed before or after it (not itself, and not in a cycle); it runs after them, can use their outputs, and is skipped if one of them failed or was skipped. Can't be empty (supported since xprin 0.6.0, and the only way from 0.7.0, see [Dependencies Between Test Cases](how-it-works.md#dependencies-between-test-cases-needs)) |
-| `inputs` | ✅ | map | Inputs for the test case |
-| `patches` | ❌ | map | XR patching configuration |
-| `hooks` | ❌ | map | Hooks for the test case |
-| `assertions` | ❌ | map | Assertions to validate rendered resources (see [Assertions](assertions.md)) |
+| Property | Type | Required | Description |
+| :------- | :--- | :------: | :---------- |
+| `common` | [`common`](#common) | no | Common config for all tests |
+| `tests` | list of [`tests[*]`](#tests) | yes | List of test cases |
 
-### Inputs
+<!-- DOCS_END_ROOT -->
 
-| Field | Required | Type | Description |
-|-------|----------|------|-------------|
-| `xr` | ✅* | string | Composite Resource file |
-| `claim` | ✅* | string | Claim file (mutually exclusive with `xr`) |
-| `composition` | ✅ | string | Composition file |
-| `functions` | ✅ | string | Path to Crossplane functions |
-| `crds` | ❌ | []string | Paths to CRDs for validation |
-| `context-files` | ❌ | map[string]string | Context files for render |
-| `context-values` | ❌ | map[string]string | Context values for render |
-| `observed-resources` | ❌ | string | Path to observed resources file |
-| `extra-resources` | ❌ | string | Path to extra resources file |
-| `function-credentials` | ❌ | string | Path to function credentials file |
+### common
 
-*Either `xr` or `claim` is required, but not both. They can be specified either in the `common` section or in individual test cases. If specified in both, the test case value takes precedence.
+Shared by every test case. Every property is optional.
 
-### Patches
+<!-- DOCS_START_COMMON -->
 
-| Field | Required | Type | Description |
-|-------|----------|------|-------------|
-| `xrd` | ❌ | string | Path to the Claim's XRD file |
-| `connection-secret` | ❌ | bool | Enable connection secret testing |
-| `connection-secret-name` | ❌ | string | Custom name for connection secret |
-| `connection-secret-namespace` | ❌ | string | Custom namespace for connection secret |
+| Property | Type | Required | Description |
+| :------- | :--- | :------: | :---------- |
+| `inputs` | [`inputs`](#inputs) | no | Common inputs (composition, Claim/XR, etc.) for all testcases |
+| `patches` | [`patches`](#patches) | no | Common XR patching configuration for all testcases |
+| `hooks` | [`hooks`](#hooks) | no | Common hooks for all testcases |
+| `assertions` | [`assertions`](#assertions) | no | Common assertions to validate rendered resources for all testcases |
 
-### Hooks
+<!-- DOCS_END_COMMON -->
 
-| Field | Required | Type | Description |
-|-------|----------|------|-------------|
-| `pre-test` | ❌ | list | Pre-test hooks (execute before test) |
-| `post-test` | ❌ | list | Post-test hooks (execute after test) |
+### `tests[*]`
 
-### Hook Item
+A test case: an element of `tests`. It has the same `inputs`, `patches`, `hooks` and `assertions` as `common`.
 
-| Field | Required | Type | Description |
-|-------|----------|------|-------------|
-| `name` | ❌ | string | Hook name (used in error messages) |
-| `run` | ✅ | string | Shell command to execute |
+<!-- DOCS_START_TESTS -->
 
-### Hook result status
+| Property | Type | Required | Description |
+| :------- | :--- | :------: | :---------- |
+| `name` | `string` | yes | Descriptive name for the testcase |
+| `id` | `string` | no | Unique identifier for the testcase |
+| `needs` | list of `string` (at least 1) | no | IDs of the testcases that this one depends on |
+| `inputs` | [`inputs`](#inputs) | conditional | Inputs of a testcase (Required unless specified in the common inputs) |
+| `patches` | [`patches`](#patches) | no | XR patching configuration |
+| `hooks` | [`hooks`](#hooks) | no | Execution hooks |
+| `assertions` | [`assertions`](#assertions) | no | Assertions to validate rendered resources |
 
-- **[✓]** – Hook ran and exited with code 0.
-- **[x]** – Hook ran and exited with a non-zero code; the output shows the hook’s stdout/stderr (if any).
-- **[!]** – Hook could not run (e.g. template rendering failure). Treated as an operational error, not as “hook ran and failed.”
+<!-- DOCS_END_TESTS -->
 
-See [Statuses and output symbols](how-it-works.md#statuses-and-output-symbols) for the full list across all phases.
+### inputs
 
-### Assertions
+Used in `common.inputs` and `tests[*].inputs`.
 
-Assertions are grouped by **engine**. Under `common.assertions` or a test case’s `assertions`, you can use one or more of these keys:
+<!-- DOCS_START_INPUTS -->
 
-| Key | Description |
-|-----|-------------|
-| `xprin` | List of in-process assertions: count, existence, field type/value checks. See [Assertion types (xprin)](assertions.md#assertion-types-xprin). |
-| `diff` | List of golden-file assertions (unified diff, [go-difflib](https://github.com/pmezard/go-difflib)). See [Golden-file assertions (diff and dyff)](assertions.md#golden-file-assertions-diff-and-dyff). |
-| `dyff` | List of golden-file assertions (structural YAML diff, [dyff](https://github.com/homeport/dyff)). See [Golden-file assertions (diff and dyff)](assertions.md#golden-file-assertions-diff-and-dyff). |
+| Property | Type | Required | Description |
+| :------- | :--- | :------: | :---------- |
+| `claim` | `string` | conditional | Path to Claim file (one of Claim or XR must be set, either in the test case or in the common inputs) |
+| `xr` | `string` | conditional | Path to XR file (one of Claim or XR must be set, either in the test case or in the common inputs) |
+| `composition` | `string` | conditional | Path to composition file (Required unless specified in the common inputs) |
+| `functions` | `string` | conditional | Path to functions file or directory (Required unless specified in the common inputs) |
+| `crds` | list of `string` | no | Paths to CRD files |
+| `context-files` | map of `string` | no | Map of context keys to file paths |
+| `context-values` | map of `string` | no | Map of context keys to inline values |
+| `observed-resources` | `string` | no | Path to observed resources file |
+| `extra-resources` | `string` | no | Path to extra resources file |
+| `function-credentials` | `string` | no | Path to function credentials file |
 
-The table below covers **xprin** assertion item fields:
+<!-- DOCS_END_INPUTS -->
 
-| Field | Required | Type | Description |
-|-------|----------|------|-------------|
-| `name` | ✅ | string | Assertion name (descriptive identifier) |
-| `type` | ✅ | string | Assertion type (xprin only; see [Assertions](assertions.md#assertion-types-xprin)) |
-| `resource` | ✅* | string | Resource identifier: exact name, kind only, or pattern (see [Assertions – Resource field: patterns](assertions.md#resource-field-patterns-globbing)) |
-| `field` | ✅* | string | Field path for field-based assertions (e.g., `metadata.name`, `spec.replicas`) |
-| `operator` | ✅* | string | Operator for field value assertions (e.g., `==`, `is`) |
-| `value` | ✅* | any | Expected value for count, type, or field value assertions |
+### patches
 
-*Required fields depend on assertion type. For complete documentation, including diff and dyff, see [Assertions](assertions.md).
+Used in `common.patches` and `tests[*].patches`.
 
-The table below covers **diff** and **dyff** assertion item fields:
+<!-- DOCS_START_PATCHES -->
 
-| Field | Required | Type | Description |
-|-------|----------|------|-------------|
-| `name` | ✅ | string | Assertion name (descriptive identifier) |
-| `expected` | ✅ | string | Path to golden (expected) file |
-| `resource` | ❌ | string | Resource identifier (format: `Kind/name`) |
+| Property | Type | Required | Description |
+| :------- | :--- | :------: | :---------- |
+| `xrd` | `string` | no | Path to the XR's or Claim's XRD |
+| `connection-secret` | `boolean` | no | When true, create a connection secret for the XR |
+| `connection-secret-name` | `string` | no | Name of the connection secret |
+| `connection-secret-namespace` | `string` | no | Namespace of the connection secret |
 
+<!-- DOCS_END_PATCHES -->
 
-## Path Resolution
+### hooks
 
-Input path fields support:
-- **Absolute paths**: `/absolute/path/to/file.yaml`
-- **Relative paths**: `relative/path/to/file.yaml` (relative to test suite file)
-- **Template variables**: `{{ .Repositories.myrepo }}/path/to/file.yaml`
+Used in `common.hooks` and `tests[*].hooks`. Each hook is a `name` and a `run`.
 
-For detailed information, see [How It Works](how-it-works.md#path-resolution).
+<!-- DOCS_START_HOOKS -->
 
-## Template Variables
+| Property | Type | Required | Description |
+| :------- | :--- | :------: | :---------- |
+| `pre-test` | list of `object` | no | Hooks that are executed before the testcase |
+| `pre-test[*].name` | `string` | no | Descriptive name for the hook |
+| `pre-test[*].run` | `string` | yes | Command to run |
+| `post-test` | list of `object` | no | Hooks that are executed after the testcase |
+| `post-test[*].name` | `string` | no | Descriptive name for the hook |
+| `post-test[*].run` | `string` | yes | Command to run |
 
-### Repository Variables
-- `{{ .Repositories.name }}` - Repository paths from configuration
+<!-- DOCS_END_HOOKS -->
 
-### Input Variables
-Available in hooks and other test case fields:
-- `{{ .Inputs.XR }}` - XR file path
-- `{{ .Inputs.Claim }}` - Claim file path
-- `{{ .Inputs.Composition }}` - Composition file path
-- `{{ .Inputs.Functions }}` - Functions directory path
-- All other input fields via `{{ .Inputs.FieldName }}`
+### assertions
 
-### Output Variables
-Available in post-test hooks only:
-- `{{ .Outputs.XR }}` - XR file path
-- `{{ .Outputs.Render }}` - Full rendered output path
-- `{{ .Outputs.Validate }}` - Raw validate output path
-- `{{ .Outputs.Assertions }}` - Assertions output path (assertions.txt; nil if no assertions)
-- `{{ .Outputs.RenderCount }}` - Number of rendered resources
-- `{{ index .Outputs.Rendered "Kind/Name" }}` - Individual resource paths
+Used in `common.assertions` and `tests[*].assertions`.
 
-### Cross-test References
-Available when test has `id` field, to the test cases that list it in `needs`:
-- `{{ .Tests.{test-id}.Outputs.XR }}` - XR from referenced test
-- `{{ .Tests.{test-id}.Outputs.Render }}` - Render output from referenced test
-- `{{ .Tests.{test-id}.Outputs.Validate }}` - Validate output from referenced test
-- `{{ .Tests.{test-id}.Outputs.Assertions }}` - Assertions output from referenced test
-- `{{ .Tests.{test-id}.Outputs.RenderCount }}` - Render count from referenced test
-- `{{ index .Tests.{test-id}.Outputs.Rendered "Kind/Name" }}` - Individual resource from referenced test
+<!-- DOCS_START_ASSERTIONS -->
 
-A test case can depend on another one with `needs` alone, without using its outputs. To use them (`.Tests.{test-id}`) it has to list that ID in `needs`: that is the only way from 0.7.0. See [Dependencies Between Test Cases](how-it-works.md#dependencies-between-test-cases-needs) and [Migrating](how-it-works.md#migrating-from-automatic-detection-deprecated). The `needs` of the test cases form their **dependency graph**: to see it for your testsuite files, as a tree and without running anything, use `xprin graph <targets>` (see [Dependency Graph](how-it-works.md#dependency-graph)).
+| Property | Type | Required | Description |
+| :------- | :--- | :------: | :---------- |
+| `xprin` | list of [`assertions.xprin[*]`](#assertionsxprin) | no | xprin assertions (in-process) |
+| `diff` | list of [`assertions.diff[*]` and `assertions.dyff[*]`](#assertionsdiff-and-assertionsdyff) | no | diff assertions (go-native compare to golden file) |
+| `dyff` | list of [`assertions.diff[*]` and `assertions.dyff[*]`](#assertionsdiff-and-assertionsdyff) | no | dyff assertions (dyff between expected and actual) |
 
-For detailed information, see [How It Works](how-it-works.md#template-variable-expansion) and [How It Works](how-it-works.md#test-chaining).
+<!-- DOCS_END_ASSERTIONS -->
 
-## Test Discovery
+### `assertions.xprin[*]`
 
-Test suite files are discovered when they match:
-- `xprin.yaml`
-- `*_xprin.yaml` pattern
+<!-- DOCS_START_ASSERTIONS_XPRIN -->
 
-Targets can be:
-- Single file: `xprin test file_xprin.yaml`
-- Directory: `xprin test mytests/`
-- Recursive: `xprin test mytests/...`
-- Combination: `xprin test file_xprin.yaml mytests/...`
+| Property | Type | Required | Description |
+| :------- | :--- | :------: | :---------- |
+| `name` | `string` | yes | Descriptive name for the assertion |
+| `type` | `string` | yes | Type of assertion. Allowed values: `Count`, `Exists`, `NotExists`, `FieldType`, `FieldExists`, `FieldNotExists`, `FieldValue` |
+| `resource` | `string` | no | Resource identifier for resource-based assertions (format: Kind/Name e.g. "Cluster/platform-aws-rds") |
+| `field` | `string` | no | Field path for field-based assertions (e.g., "metadata.name") |
+| `operator` | `string` | no | Operator for field value assertions (== or is). Allowed values: `==`, `is` |
+| `value` | any | no | Expected value for the assertion |
+
+<!-- DOCS_END_ASSERTIONS_XPRIN -->
+
+Which of `resource`, `field`, `operator` and `value` an assertion needs depends on its `type`; see [Assertion types (xprin)](assertions.md#assertion-types-xprin).
+
+### `assertions.diff[*]` and `assertions.dyff[*]`
+
+<!-- DOCS_START_ASSERTIONS_GOLDEN -->
+
+| Property | Type | Required | Description |
+| :------- | :--- | :------: | :---------- |
+| `name` | `string` | yes | Descriptive name for the assertion |
+| `expected` | `string` | yes | Path to golden (expected) file |
+| `resource` | `string` | no | Resource identifier for resource-based assertions (format: Kind/Name e.g. "Cluster/platform-aws-rds") |
+
+<!-- DOCS_END_ASSERTIONS_GOLDEN -->
+
+See [Golden-file assertions (diff and dyff)](assertions.md#golden-file-assertions-diff-and-dyff).
 
 ---
 
