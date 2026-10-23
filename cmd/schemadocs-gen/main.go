@@ -15,12 +15,13 @@ limitations under the License.
 */
 
 // schemadocs-gen fills the property tables of docs/testsuite-specification.md from the JSON schema written by schema-gen.
-// Each table sits between <!-- DOCS_START_<NAME> --> and <!-- DOCS_END_<NAME> --> markers; the rest of the file is hand-written.
+// A list of every property, with links to their rows, sits between the DOCS_START_INDEX and DOCS_END_INDEX markers. Each table sits between <!-- DOCS_START_<NAME> --> and <!-- DOCS_END_<NAME> --> markers; the rest of the file is hand-written.
 package main
 
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -55,6 +56,7 @@ var inlined = []string{"Hook"}
 
 const (
 	requiredKeyword = "x-xprin-required" // Set by a struct tag in internal/api, on the properties required only in the merged result
+	indexName       = "INDEX"
 	startMarker     = "<!-- DOCS_START_%s -->"
 	endMarker       = "<!-- DOCS_END_%s -->"
 )
@@ -148,13 +150,77 @@ func render(rawSchema []byte, doc string) (string, error) {
 
 		var err error
 
-		doc, err = fill(doc, sec.name, table(s.Defs, def))
+		doc, err = fill(doc, sec.name, table(s.Defs, sec, def))
 		if err != nil {
 			return "", err
 		}
 	}
 
-	return doc, nil
+	root, ok := sectionOf("TestSuiteSpec")
+	if !ok {
+		return "", errors.New("no section for TestSuiteSpec")
+	}
+
+	return fill(doc, indexName, index(s.Defs, root, s.Defs[root.def]))
+}
+
+// sectionOf returns the section of a type.
+func sectionOf(def string) (section, bool) {
+	for _, sec := range sections {
+		if sec.def == def {
+			return sec, true
+		}
+	}
+
+	return section{}, false
+}
+
+// index lists the path of every property, from the root of the file, each linking to its row (or to its section, when its type has one).
+func index(defs map[string]*node, sec section, def *node) string {
+	var b strings.Builder
+
+	indexEntries(&b, defs, sec, def, "", "")
+
+	return b.String()
+}
+
+// indexEntries writes the properties of def: rel is their path inside the section sec, shown the one in the file.
+func indexEntries(b *strings.Builder, defs map[string]*node, sec section, def *node, rel, shown string) {
+	for _, key := range def.order {
+		p := def.props[key]
+		path := shown + key
+		link := sec.anchor + "." + rel + key
+		// A property whose type (or the items of it) has a section links to the section
+		ref := p.Ref
+		if p.Items != nil {
+			ref = p.Items.Ref
+		}
+
+		if own, ok := sectionOf(refName(ref)); ok {
+			link = own.anchor
+		}
+
+		fmt.Fprintf(b, "- [`%s`](#%s)\n", path, link)
+
+		name := refName(p.Ref)
+		suffix := ""
+
+		if p.Items != nil {
+			name = refName(p.Items.Ref)
+			suffix = "[*]"
+		}
+
+		child := defs[name]
+		if child == nil || (p.Ref == "" && p.Items == nil) {
+			continue
+		}
+
+		if inner, ok := sectionOf(name); ok {
+			indexEntries(b, defs, inner, child, "", path+suffix+".")
+		} else if slices.Contains(inlined, name) {
+			indexEntries(b, defs, sec, child, rel+key+suffix+".", path+suffix+".")
+		}
+	}
 }
 
 // checkCovered fails if a type of the schema has no table, so a new type can't go undocumented.
@@ -232,22 +298,22 @@ func (n *node) parseProperties() error {
 }
 
 // table renders the rows of a type.
-func table(defs map[string]*node, def *node) string {
+func table(defs map[string]*node, sec section, def *node) string {
 	var b strings.Builder
 
 	b.WriteString("| Property | Type | Required | Description |\n")
 	b.WriteString("| :------- | :--- | :------: | :---------- |\n")
 
-	rows(&b, defs, def, "")
+	rows(&b, defs, sec, def, "")
 
 	return b.String()
 }
 
-func rows(b *strings.Builder, defs map[string]*node, def *node, prefix string) {
+func rows(b *strings.Builder, defs map[string]*node, sec section, def *node, prefix string) {
 	for _, key := range def.order {
 		p := def.props[key]
 
-		fmt.Fprintf(b, "| `%s` | %s | %s | %s |\n", prefix+key, typeOf(defs, p), required(def, key, p), describe(defs, p))
+		fmt.Fprintf(b, "| <a id=\"%s.%s\"></a>`%s` | %s | %s | %s |\n", sec.anchor, prefix+key, prefix+key, typeOf(defs, p), required(def, key, p), describe(defs, p))
 
 		// The properties of an inlined type are rows of this table
 		if target := inlinedTarget(defs, p); target != nil {
@@ -256,7 +322,7 @@ func rows(b *strings.Builder, defs map[string]*node, def *node, prefix string) {
 				sub += "[*]"
 			}
 
-			rows(b, defs, target, sub+".")
+			rows(b, defs, sec, target, sub+".")
 		}
 	}
 }
