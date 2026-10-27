@@ -183,6 +183,24 @@
       enabled: true,
     },
     {
+      description: 'Group Earthfile image updates (FROM)',
+      matchManagers: [
+        'dockerfile',
+      ],
+      matchFileNames: [
+        'Earthfile',
+      ],
+      groupName: 'earthfile',
+    },
+    {
+      description: 'Group Earthfile tool versions (golangci-lint, E2E Crossplane v1); Go and the other Crossplane versions have their own groups below',
+      matchDepNames: [
+        'golangci/golangci-lint',
+        'crossplane/crossplane-e2e-v1',
+      ],
+      groupName: 'earthfile',
+    },
+    {
       description: 'Ignore k8s.io/client-go older versions, they switched to semantic version and old tags are still available in the repo',
       matchDatasources: [
         'go',
