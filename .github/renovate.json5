@@ -251,6 +251,13 @@
       groupName: 'github actions',
     },
     {
+      description: 'Group the Earthly version bump in GitHub workflows with GitHub Actions updates',
+      matchDepNames: [
+        'earthly/earthly',
+      ],
+      groupName: 'github actions',
+    },
+    {
       description: 'Group all go version updates',
       matchDatasources: [
         'golang-version',
