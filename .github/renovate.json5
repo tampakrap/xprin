@@ -281,6 +281,9 @@
         'golang-version',
       ],
       groupName: 'golang version',
+      // Also raise a PR for the latest patch of the current minor, so patch
+      // updates of go.mod and the Earthfile are not hidden behind a minor one.
+      separateMinorPatch: true,
     },
   ],
 }
