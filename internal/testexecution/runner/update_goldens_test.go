@@ -90,12 +90,12 @@ func plainCase(id string, needs ...string) api.TestCase {
 func updateGoldensRan(t *testing.T, spec *api.TestSuiteSpec, failing ...string) (output string, ran []string) {
 	t.Helper()
 
-	r := newTestSession(&testexecutionOptions.Options{UpdateGoldens: true}, testsuite.New("/tests/a_xprin.yaml", spec))
+	r, tcRunner := newTestSession(&testexecutionOptions.Options{UpdateGoldens: true}, testsuite.New("/tests/a_xprin.yaml", spec))
 
 	var out bytes.Buffer
 
 	r.output = &out
-	r.r.runTestCaseFunc = func(testCase api.TestCase) *engine.TestCaseResult {
+	tcRunner.runTestCaseFunc = func(testCase api.TestCase) *engine.TestCaseResult {
 		ran = append(ran, testCase.ID)
 
 		result := engine.NewTestCaseResult(testCase.Name, testCase.ID, false, false, false, false, false)
@@ -410,12 +410,12 @@ func TestFileRun_Needs_UpdateGoldens(t *testing.T) {
 		{Name: "C", ID: "c", Needs: []string{"a"}, Assertions: golden},
 	}}
 
-	r := newTestSession(&testexecutionOptions.Options{UpdateGoldens: true}, testsuite.New("/tests/a_xprin.yaml", spec))
+	r, tcRunner := newTestSession(&testexecutionOptions.Options{UpdateGoldens: true}, testsuite.New("/tests/a_xprin.yaml", spec))
 
 	var out bytes.Buffer
 
 	r.output = &out
-	r.r.runTestCaseFunc = func(testCase api.TestCase) *engine.TestCaseResult {
+	tcRunner.runTestCaseFunc = func(testCase api.TestCase) *engine.TestCaseResult {
 		return engine.NewTestCaseResult(testCase.Name, testCase.ID, false, false, false, false, false).Fail(errors.New("boom"))
 	}
 

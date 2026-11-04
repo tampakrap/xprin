@@ -18,6 +18,7 @@ package runner
 
 import (
 	"bytes"
+	"io"
 	"testing"
 
 	"github.com/crossplane-contrib/xprin/internal/api"
@@ -25,6 +26,7 @@ import (
 	testexecutionOptions "github.com/crossplane-contrib/xprin/internal/testexecution/options"
 	"github.com/crossplane-contrib/xprin/internal/testexecution/scheduler"
 	"github.com/crossplane-contrib/xprin/internal/testsuite"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"  //nolint:depguard // testify is widely used for testing
 	"github.com/stretchr/testify/require" //nolint:depguard // testify is widely used for testing
 )
@@ -37,12 +39,12 @@ func TestJob_APanicFailsOnlyThatTestCase(t *testing.T) {
 		{Name: "D", ID: "d"},
 	}}
 
-	r := newTestSession(&testexecutionOptions.Options{}, testsuite.New("/tests/a_xprin.yaml", spec))
+	r, tcRunner := newTestSession(&testexecutionOptions.Options{}, testsuite.New("/tests/a_xprin.yaml", spec))
 
 	var out bytes.Buffer
 
 	r.output = &out
-	r.r.runTestCaseFunc = func(testCase api.TestCase) *engine.TestCaseResult {
+	tcRunner.runTestCaseFunc = func(testCase api.TestCase) *engine.TestCaseResult {
 		if testCase.ID == "b" {
 			panic("boom")
 		}
@@ -65,14 +67,62 @@ func TestJob_APanicFailsOnlyThatTestCase(t *testing.T) {
 	assert.NotContains(t, out.String(), "goroutine", "the stack is for --debug")
 }
 
+// fakeRunner is a testCaseRunner that passes every test case, and records what the session gave it.
+type fakeRunner struct {
+	envs      map[string]testCaseEnv // by the ID of the test case
+	completed map[string][]string    // the IDs of the results that the test case was given
+}
+
+func (f *fakeRunner) RunTestCase(env *testCaseEnv, testCase api.TestCase, completed map[string]*engine.TestCaseResult) *engine.TestCaseResult {
+	f.envs[testCase.ID] = *env
+
+	for id := range completed {
+		f.completed[testCase.ID] = append(f.completed[testCase.ID], id)
+	}
+
+	return engine.NewTestCaseResult(testCase.Name, testCase.ID, false, false, false, false, false).Complete()
+}
+
+func newFakeRunner() *fakeRunner {
+	return &fakeRunner{envs: map[string]testCaseEnv{}, completed: map[string][]string{}}
+}
+
+func TestSession_GivesTheRunnerTheEnvAndTheResultsThatAreDone(t *testing.T) {
+	// B is first in the file, and runs second: it needs A
+	spec := &api.TestSuiteSpec{Tests: []api.TestCase{
+		{Name: "B", ID: "b", Needs: []string{"a"}},
+		{Name: "A", ID: "a"},
+	}}
+	suite := testsuite.New("/tests/a_xprin.yaml", spec)
+	fake := newFakeRunner()
+	s := NewSession(&testexecutionOptions.Options{}, suite, fake)
+	s.output = io.Discard
+	s.fs = afero.NewMemMapFs()
+
+	require.NoError(t, s.Setup())
+
+	finishErrs, err := scheduler.Run([]scheduler.Job{s}, 1)
+	require.NoError(t, err)
+	require.NoError(t, finishErrs[0])
+
+	require.Len(t, fake.envs, 2)
+
+	for id, env := range fake.envs {
+		assert.Same(t, suite, env.testSuite, "%s gets the file", id)
+		assert.NotEmpty(t, env.savedOutputsDir, "%s gets the directory of the saved outputs", id)
+	}
+
+	assert.Equal(t, 1, fake.envs["a"].index, "the numbers are the ones of the order that they run in, which starts at 1")
+	assert.Equal(t, 2, fake.envs["b"].index)
+	assert.Empty(t, fake.completed["a"], "nothing is done when A runs")
+	assert.Equal(t, []string{"a"}, fake.completed["b"], "A is done when B runs")
+}
+
 func TestJob_FinishReturnsNothingWhenNothingFailed(t *testing.T) {
 	spec := &api.TestSuiteSpec{Tests: []api.TestCase{{Name: "A", ID: "a"}}}
 
-	r := newTestSession(&testexecutionOptions.Options{}, testsuite.New("/tests/a_xprin.yaml", spec))
+	r := NewSession(&testexecutionOptions.Options{}, testsuite.New("/tests/a_xprin.yaml", spec), newFakeRunner())
 	r.output = &bytes.Buffer{}
-	r.r.runTestCaseFunc = func(testCase api.TestCase) *engine.TestCaseResult {
-		return engine.NewTestCaseResult(testCase.Name, testCase.ID, false, false, false, false, false)
-	}
 
 	require.NoError(t, r.Setup())
 
