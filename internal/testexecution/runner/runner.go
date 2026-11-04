@@ -69,12 +69,16 @@ type testSuiteEnv struct {
 	testCaseResults []*engine.TestCaseResult // the result of each test case, by its positionInTestSuite, once it ran
 }
 
-// testCaseEnv is the state of one test case run.
+// testCaseEnv is what one test case run works with: the directories that are its own, and what it takes from the
+// testsuite file that it is a part of. The phases of a test case read the file only from here.
 type testCaseEnv struct {
 	tmpDir     string
 	inputsDir  string
 	outputsDir string
 	index      int
+
+	testSuite       *testsuite.TestSuite // the file: where its paths are relative to, its spec and its dependency graph
+	savedOutputsDir string               // where the outputs of the test cases that others use are saved
 }
 
 // NewRunner creates a new test runner.
@@ -215,11 +219,13 @@ func (r *Runner) executeTestCase(testCase api.TestCase, index int, testSuiteResu
 		r.debug.Printf("Starting test case '%s'\n", testCase.Name)
 	}
 
+	env := &testCaseEnv{index: index, testSuite: r.testSuite, savedOutputsDir: r.env.savedOutputsDir}
+
 	result := engine.NewTestCaseResult(testCase.Name, testCase.ID, r.Verbose, r.ShowRender, r.ShowValidate, r.ShowHooks, r.ShowAssertions)
 
 	// Skip immediately a test case that the mode has no use for, whatever it needs (the modes are in mode.go and
 	// update_goldens.go)
-	if r.mode.skips(testCase) {
+	if r.mode.skips(env, testCase) {
 		return result.Skip()
 	}
 
@@ -233,8 +239,6 @@ func (r *Runner) executeTestCase(testCase api.TestCase, index int, testSuiteResu
 	if r.runTestCaseFunc != nil {
 		return r.runTestCaseFunc(testCase)
 	}
-
-	env := &testCaseEnv{index: index}
 
 	// Create a temporary directory for the test case (with inputs and outputs subdirectories)
 	var err error
@@ -270,12 +274,12 @@ func (r *Runner) executeTestCase(testCase api.TestCase, index int, testSuiteResu
 		r.debug.Printf("- Outputs: %s\n", env.outputsDir)
 	}
 
-	if r.testSuite.Spec.HasCommon() {
-		testCase.MergeCommon(r.testSuite.Spec.Common)
+	if env.testSuite.Spec.HasCommon() {
+		testCase.MergeCommon(env.testSuite.Spec.Common)
 	}
 
 	// Process template variables for this test case
-	if err := r.processTemplateVariables(&testCase, needsResults); err != nil {
+	if err := r.processTemplateVariables(env, &testCase, needsResults); err != nil {
 		return result.Fail(fmt.Errorf("failed to process template variables: %w", err))
 	}
 
@@ -287,7 +291,7 @@ func (r *Runner) executeTestCase(testCase api.TestCase, index int, testSuiteResu
 		r.debug.PrintTestCase(testCase, "Test specification:")
 	}
 
-	if failed := r.expandInputPaths(&testCase, result); failed != nil {
+	if failed := r.expandInputPaths(env, &testCase, result); failed != nil {
 		return failed
 	}
 
@@ -295,7 +299,7 @@ func (r *Runner) executeTestCase(testCase api.TestCase, index int, testSuiteResu
 		return failed
 	}
 
-	if failed := r.runPreTestHooks(testCase, needsResults, result); failed != nil {
+	if failed := r.runPreTestHooks(env, testCase, needsResults, result); failed != nil {
 		return failed
 	}
 
