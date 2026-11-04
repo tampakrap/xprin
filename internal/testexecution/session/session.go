@@ -14,9 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package runner
+// Package session runs the test cases of one testsuite file as a job of the scheduler: each testsuite file creates a
+// session, and its test cases are the tasks of the job. The session keeps what is of the file as a whole: the results
+// so far, the directory of the outputs that the test cases share, the order of the output and the summary. The runner
+// runs each test case.
+package session
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -29,6 +34,7 @@ import (
 	"github.com/crossplane-contrib/xprin/internal/graph"
 	"github.com/crossplane-contrib/xprin/internal/testexecution/artifacts"
 	testexecutionOptions "github.com/crossplane-contrib/xprin/internal/testexecution/options"
+	"github.com/crossplane-contrib/xprin/internal/testexecution/runner"
 	"github.com/crossplane-contrib/xprin/internal/testexecution/scheduler"
 	"github.com/crossplane-contrib/xprin/internal/testsuite"
 	"github.com/gertd/go-pluralize"
@@ -42,7 +48,7 @@ import (
 type Session struct {
 	options   *testexecutionOptions.Options
 	fs        afero.Fs
-	runner    testCaseRunner
+	runner    TestCaseRunner
 	testSuite *testsuite.TestSuite // the file that is run: its path, its spec and its dependency graph
 	output    io.Writer
 	// debugOutput is where the --debug lines that a result kept go.
@@ -50,19 +56,22 @@ type Session struct {
 	env         *testSuiteEnv
 }
 
+// ErrTestsFailed is what Finish wraps when some test cases failed.
+var ErrTestsFailed = errors.New("tests failed")
+
 // Session is a scheduler.Job: the tasks are the test cases of the file, by their positionInTestSuite. Setup has to be
 // called before the scheduler runs it.
 var _ scheduler.Job = (*Session)(nil)
 
-// testCaseRunner is what the session needs from the runner: to run one test case. The session makes the input of the test
+// TestCaseRunner is what the session needs from the runner: to run one test case. The session makes the input of the test
 // case, and gives it the results of the ones that already ran, for it to find the ones that the test case needs.
 // It is the Runner, and the tests of the session replace it.
-type testCaseRunner interface {
-	RunTestCase(input Input, testCase api.TestCase, completed map[string]*engine.TestCaseResult) *engine.TestCaseResult
+type TestCaseRunner interface {
+	RunTestCase(input runner.Input, testCase api.TestCase, completed map[string]*engine.TestCaseResult) *engine.TestCaseResult
 }
 
-// NewSession creates the session of a testsuite file, which runs its test cases with runner. It is not set up yet.
-func NewSession(options *testexecutionOptions.Options, testSuite *testsuite.TestSuite, runner testCaseRunner) *Session {
+// New creates the session of a testsuite file, which runs its test cases with runner. It is not set up yet.
+func New(options *testexecutionOptions.Options, testSuite *testsuite.TestSuite, runner TestCaseRunner) *Session {
 	return &Session{
 		options:     options,
 		fs:          afero.NewOsFs(),
@@ -159,7 +168,7 @@ func (s *Session) runAndStoreTestCase(positionInTestSuite int) {
 	testCase := s.testSuite.Spec.Tests[positionInTestSuite]
 
 	// Run the test and let the engine handle everything
-	input := Input{
+	input := runner.Input{
 		Index:           s.env.positionInOrder[positionInTestSuite] + 1,
 		TestSuite:       s.testSuite,
 		SavedOutputsDir: s.env.savedOutputsDir,
