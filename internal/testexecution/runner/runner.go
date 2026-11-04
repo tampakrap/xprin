@@ -58,13 +58,18 @@ type Runner struct {
 // testCaseEnv is what one test case run works with: the directories that are its own, and what it takes from the
 // testsuite file that it is a part of. The phases of a test case read the file only from here.
 type testCaseEnv struct {
+	Input
+
 	tmpDir     string
 	inputsDir  string
 	outputsDir string
-	index      int
+}
 
-	testSuite       *testsuite.TestSuite // the file: where its paths are relative to, its spec and its dependency graph
-	savedOutputsDir string               // where the outputs of the test cases that others use are saved
+// Input is what a test case is run with, from the testsuite file that it is a part of.
+type Input struct {
+	Index           int                  // the number of the test case in the order that they run, which starts at 1
+	TestSuite       *testsuite.TestSuite // the file: where its paths are relative to, its spec and its dependency graph
+	SavedOutputsDir string               // where the outputs of the test cases that others use are saved
 }
 
 // NewRunner creates the runner of test cases, for one invocation. It keeps nothing of the test cases that it runs:
@@ -98,16 +103,16 @@ func NewRunner(options *testexecutionOptions.Options) *Runner {
 	return r
 }
 
-// RunTestCase runs a single test case, in the env that its session made for it, and returns a complete TestCaseResult.
+// RunTestCase runs a single test case, with what its session gives it in input, and returns a complete TestCaseResult.
 // completed are the results of the test cases that already ran, which the ones that this one needs are found in: it is
 // skipped if one of them failed or was skipped, or if the mode has no use for it.
 //
 // With --debug, the lines of the test case are printed as they happen when only one test case runs at a time. With
 // --parallel they would be mixed with those of the others, so they are kept in the DebugLog of the result, and its
 // session prints them with the result.
-func (r *Runner) RunTestCase(env *testCaseEnv, testCase api.TestCase, completed map[string]*engine.TestCaseResult) *engine.TestCaseResult {
+func (r *Runner) RunTestCase(input Input, testCase api.TestCase, completed map[string]*engine.TestCaseResult) *engine.TestCaseResult {
 	if !r.Debug || r.Parallel <= 1 {
-		return r.runTestCase(env, testCase, completed)
+		return r.runTestCase(input, testCase, completed)
 	}
 
 	// This copy of the runner is the one of this test case: it has its own debug log, and the mode that refers to it
@@ -117,16 +122,18 @@ func (r *Runner) RunTestCase(env *testCaseEnv, testCase api.TestCase, completed 
 	own.debug = debuglog.New(&log)
 	own.mode = newRunnerMode(&own)
 
-	result := own.runTestCase(env, testCase, completed)
+	result := own.runTestCase(input, testCase, completed)
 	result.DebugLog = log.String()
 
 	return result
 }
 
-func (r *Runner) runTestCase(env *testCaseEnv, testCase api.TestCase, completed map[string]*engine.TestCaseResult) *engine.TestCaseResult {
+func (r *Runner) runTestCase(input Input, testCase api.TestCase, completed map[string]*engine.TestCaseResult) *engine.TestCaseResult {
 	if r.Debug {
 		r.debug.Printf("Starting test case '%s'\n", testCase.Name)
 	}
+
+	env := &testCaseEnv{Input: input}
 
 	result := engine.NewTestCaseResult(testCase.Name, testCase.ID, r.Verbose, r.ShowRender, r.ShowValidate, r.ShowHooks, r.ShowAssertions)
 
@@ -181,8 +188,8 @@ func (r *Runner) runTestCase(env *testCaseEnv, testCase api.TestCase, completed 
 		r.debug.Printf("- Outputs: %s\n", env.outputsDir)
 	}
 
-	if env.testSuite.Spec.HasCommon() {
-		testCase.MergeCommon(env.testSuite.Spec.Common)
+	if env.TestSuite.Spec.HasCommon() {
+		testCase.MergeCommon(env.TestSuite.Spec.Common)
 	}
 
 	// Process template variables for this test case

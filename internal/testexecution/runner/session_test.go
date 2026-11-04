@@ -69,12 +69,12 @@ func TestJob_APanicFailsOnlyThatTestCase(t *testing.T) {
 
 // fakeRunner is a testCaseRunner that passes every test case, and records what the session gave it.
 type fakeRunner struct {
-	envs      map[string]testCaseEnv // by the ID of the test case
-	completed map[string][]string    // the IDs of the results that the test case was given
+	inputs    map[string]Input    // by the ID of the test case
+	completed map[string][]string // the IDs of the results that the test case was given
 }
 
-func (f *fakeRunner) RunTestCase(env *testCaseEnv, testCase api.TestCase, completed map[string]*engine.TestCaseResult) *engine.TestCaseResult {
-	f.envs[testCase.ID] = *env
+func (f *fakeRunner) RunTestCase(input Input, testCase api.TestCase, completed map[string]*engine.TestCaseResult) *engine.TestCaseResult {
+	f.inputs[testCase.ID] = input
 
 	for id := range completed {
 		f.completed[testCase.ID] = append(f.completed[testCase.ID], id)
@@ -84,10 +84,10 @@ func (f *fakeRunner) RunTestCase(env *testCaseEnv, testCase api.TestCase, comple
 }
 
 func newFakeRunner() *fakeRunner {
-	return &fakeRunner{envs: map[string]testCaseEnv{}, completed: map[string][]string{}}
+	return &fakeRunner{inputs: map[string]Input{}, completed: map[string][]string{}}
 }
 
-func TestSession_GivesTheRunnerTheEnvAndTheResultsThatAreDone(t *testing.T) {
+func TestSession_GivesTheRunnerTheInputAndTheResultsThatAreDone(t *testing.T) {
 	// B is first in the file, and runs second: it needs A
 	spec := &api.TestSuiteSpec{Tests: []api.TestCase{
 		{Name: "B", ID: "b", Needs: []string{"a"}},
@@ -105,15 +105,15 @@ func TestSession_GivesTheRunnerTheEnvAndTheResultsThatAreDone(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, finishErrs[0])
 
-	require.Len(t, fake.envs, 2)
+	require.Len(t, fake.inputs, 2)
 
-	for id, env := range fake.envs {
-		assert.Same(t, suite, env.testSuite, "%s gets the file", id)
-		assert.NotEmpty(t, env.savedOutputsDir, "%s gets the directory of the saved outputs", id)
+	for id, input := range fake.inputs {
+		assert.Same(t, suite, input.TestSuite, "%s gets the file", id)
+		assert.NotEmpty(t, input.SavedOutputsDir, "%s gets the directory of the saved outputs", id)
 	}
 
-	assert.Equal(t, 1, fake.envs["a"].index, "the numbers are the ones of the order that they run in, which starts at 1")
-	assert.Equal(t, 2, fake.envs["b"].index)
+	assert.Equal(t, 1, fake.inputs["a"].Index, "the numbers are the ones of the order that they run in, which starts at 1")
+	assert.Equal(t, 2, fake.inputs["b"].Index)
 	assert.Empty(t, fake.completed["a"], "nothing is done when A runs")
 	assert.Equal(t, []string{"a"}, fake.completed["b"], "A is done when B runs")
 }
