@@ -11,6 +11,10 @@
 # - testcase_<ID>_update_goldens=true: run `xprin update-goldens` (file targets only) before xprin test.
 # - testcase_<ID>_graph=true: run `xprin graph` (targets only) before xprin test, and before update-goldens if that is set too.
 #   Its output is the beginning of the output that is compared with the expected file.
+#
+# Every testcase runs `xprin test` with --parallel (as many at the same time as there are CPUs; E2E_PARALLEL=N sets it, and 1 is no flag). The expected
+# files are generated without it, so they are the output of a run one test case at a time: that a parallel run matches them is
+# what shows that the output doesn't depend on running them together, also the --debug lines, which come with the result of each test case.
 
 # Multiple Successful Files (Non-Verbose)
 testcase_001="examples/mytests/1_simple_tests/example1_using-xr_xprin.yaml examples/mytests/1_simple_tests/example2_using-claim_xprin.yaml examples/mytests/2_multiple_testcases/example2_multiple-reconciliation-loops-using-common_xprin.yaml"
