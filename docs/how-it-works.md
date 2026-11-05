@@ -14,7 +14,7 @@ Before any test case of a file runs, xprin loads it once:
 2. The [dependency graph](#dependency-graph) is built from the `needs` of the test cases, and checked for cycles. A file with a problem is reported with all its problems, and none of its test cases runs.
 3. The graph gives the order in which the test cases run: every test case after the ones it needs, whatever the order of the file.
 
-The test cases then run one after another in that order (currently xprin doesn't run test cases in parallel). One that needs a test case that failed or was skipped is skipped (see [Dependencies Between Test Cases](#dependencies-between-test-cases-needs)); the others go through the phases below.
+The test cases then run one after another in that order, or up to N at a time with [`--parallel`](#parallel-execution). One that needs a test case that failed or was skipped is skipped (see [Dependencies Between Test Cases](#dependencies-between-test-cases-needs)); the others go through the phases below.
 
 ## Phase-by-Phase Breakdown
 
@@ -633,6 +633,27 @@ The graph is made of the [`needs`](#dependencies-between-test-cases-needs) of th
 - A testsuite file that doesn't use `needs` has no dependencies to show, so all its test cases are at the top level. If it uses `.Tests` anyway, it fails (see [Migrating](#migrating-from-xprin-05-and-earlier)).
 - Dependencies that are not declared in `needs` are not shown, for example a hook that relies on files or state left behind by another test case.
 
+## Parallel Execution
+
+By default, xprin runs the test cases one at a time. With `-p N` (or `--parallel=N`) it runs up to N test cases at the same time, across all the testsuite files of the run; `--parallel` without a number uses as many as there are CPUs. N must be 1 or more, and 1 is the default. `xprin update-goldens` has no such flag.
+
+```
+➜ xprin test tests/... -p 4
+```
+
+**What runs together.** A test case waits only for the test cases it lists in [`needs`](#dependencies-between-test-cases-needs): every other one may run at the same time, including test cases of different testsuite files. When one of them ends and a worker is free, the next test case that is ready starts, even if it belongs to the next file. A test case whose `needs` failed or was skipped is skipped, as in a run without the flag. A failure doesn't stop the run: everything that can run, runs, and what is already running finishes. A panic in one test case fails only that one.
+
+**The output is the one of a run without the flag**, apart from the timings. Results are printed in the order that the test cases would run one at a time (the order of the graph), the files in the order they are found, and each result as soon as everything before it was printed, so the output of two test cases never mixes. The line of a file comes after its last test case. There are two differences:
+
+- With `--debug`, the lines of each test case are printed together, just before its result, in the same order as the results, and not as they happen (with one test case at a time they are printed as they happen). The lines of loading the files, and of setting them up, come first.
+- All the testsuite files are loaded before the first test case runs, as without the flag: a file that can't be loaded is reported before the results of the files that were found earlier.
+
+**Test cases are assumed to be independent**, apart from what `needs` says. xprin can't see what two test cases share outside of it: a file that two hooks write, a port, a directory, an external system. If one test case depends on another for that, list it in the `needs` of the other, which orders them (a `needs` doesn't have to be used through `.Tests`). The hooks of a testsuite file run in its directory, also when several of its test cases run at the same time.
+
+**It costs resources.** Each render starts a Crossplane controller container (with Crossplane CLI v2.3+), and the function containers that its composition needs, so N test cases at the same time are N renders at the same time on your Docker. The [function containers are reused](#function-container-reuse), and the first render that uses an image creates its container while the other renders that use it wait, so the first test cases of a run that use the same functions don't start faster. The gain is in the test cases after those, and in the ones that use different functions.
+
+**Parallel execution and function container reuse work best together.** Reuse removes the cost of starting a function container for every render (only the first test case that uses an image pays for it), and parallel execution overlaps the renders of the test cases that don't need each other. So the time of a run is not the sum of the times of its test cases, and each test case that you add costs only the part of its render that doesn't overlap with the others, with no container to start. Reuse is on by default (unless you pass `--no-container-reuse`), so `-p` is all you need to get both.
+
 ## Artifacts
 
 xprin keeps files for two purposes, and calls them internal and external artifacts.
@@ -654,7 +675,7 @@ artifacts: /tmp/xprin-debug/xprin-artifacts-20260101120000/tests/aws_xprin
 
 The directory of a testsuite file mirrors its path from where you ran xprin, without the extension, and there is one directory per test case, numbered in the order they ran. A skipped test case has nothing to export.
 
-xprin doesn't save the results of a run. The result of each test case is kept in memory while its testsuite file runs, and printed as soon as the test case ends; the line of the file is printed at the end. To keep the files of a run, use `--artifacts-dir`: `assertions.txt`, in the outputs of a test case, has the results of its assertions.
+xprin doesn't save the results of a run. The result of each test case is kept in memory while its testsuite file runs, and printed as soon as the test cases before it (in the order of a serial run) are printed; the line of the file is printed at the end. To keep the files of a run, use `--artifacts-dir`: `assertions.txt`, in the outputs of a test case, has the results of its assertions.
 
 ## Function Container Reuse
 
@@ -671,6 +692,8 @@ By default, `xprin test` reuses one Docker container per unique composition func
 **What it saves:** on this repository's own examples (22 testsuite files), a run took 72s without reuse and 35s with it, and created 2 function containers instead of 90.
 
 **Why this is safe:** Crossplane composition functions are stateless by contract. In a real cluster, the same function container already serves many unrelated reconciles over its lifetime without restarting. Reusing a container across test cases relies on the same guarantee.
+
+**With `--parallel`:** the renders that start at the same time take turns on the first use of an image: the first one creates the container, and the others that use the same image wait for it, because Docker refuses to create two containers with the same name. After that, they all use the running container.
 
 **Disabling it:** pass `--no-container-reuse` (to `xprin test` or `xprin update-goldens`) to fall back to a fresh container per render call, matching the pre-reuse behavior. You might want this if you suspect a function under test isn't actually stateless, or to rule out container reuse while debugging an unrelated issue. It is also how user-set `runtime-docker-name`, `runtime-docker-cleanup` and `runtime-docker-network` annotations are kept, see [Migrating from User-Set Container Annotations](#migrating-from-user-set-container-annotations).
 

@@ -9,6 +9,7 @@ This directory contains step-by-step examples to help you learn how to use `xpri
 - [Check Your Setup](#check-your-setup)
 - [Basic Examples](#basic-examples)
 - [Multiple Test Cases](#multiple-test-cases)
+- [Parallel Execution](#parallel-execution)
 - [Patching XRs](#patching-xrs)
 - [Hooks](#hooks)
 - [Chained Tests](#chained-tests)
@@ -535,6 +536,24 @@ ok	examples/mytests/2_multiple_testcases/example2_multiple-reconciliation-loops-
 Note: This produces identical output to Example 1, demonstrating that `common.inputs` is purely a convenience feature for reducing repetition. Note that if an input is defined in both `common.inputs` and at the test case level, the test case value takes precedence.
 
 </details>
+
+---
+
+## Parallel Execution
+
+By default the test cases run one at a time. `-p N` (or `--parallel=N`) runs up to N of them at the same time, across all the testsuite files, and `--parallel` without a number runs as many as there are CPUs. The output is the one of a run without it: the results come in the same order, and each one is printed when everything before it was, so you can add the flag to any of the examples in this directory without changing what you read:
+
+```bash
+# Every example below, up to 4 test cases at a time
+xprin test examples/mytests/... -p 4
+
+# As many as there are CPUs
+xprin test examples/mytests/... --parallel
+```
+
+A test case still waits for the ones it lists in `needs`: the [chained tests](#chained-tests) run in the same order as without the flag, and the test cases that don't need each other run together. With `--debug`, the lines of each test case are printed with its result, so they are not mixed with those of the others. See [Parallel Execution](../docs/how-it-works.md#parallel-execution) for what runs together, and what to keep in mind when the test cases share something that xprin can't see.
+
+**Parallel execution and [function container reuse](#example-1-multiple-test-cases-emulating-multiple-reconciliation-loops) work best together.** Reuse removes the cost of starting a function container for every render: only the first test case that uses a function image pays for it. Parallel execution then overlaps the renders of all the others. So the time of a run is not the sum of the times of its test cases, and when you add test cases to a suite you add only the part of their render that doesn't overlap with the rest, with no container to start. This is why it is worth running the whole suite with both, which is what you get by default with `-p`: reuse is on unless you pass `--no-container-reuse`.
 
 ---
 
