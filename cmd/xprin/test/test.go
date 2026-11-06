@@ -23,6 +23,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	internalcfg "github.com/crossplane-contrib/xprin/internal/config"
+	"github.com/crossplane-contrib/xprin/internal/debuglog"
 	testexecutionOptions "github.com/crossplane-contrib/xprin/internal/testexecution/options"
 	"github.com/crossplane-contrib/xprin/internal/testexecution/processor"
 	"github.com/crossplane-contrib/xprin/internal/utils"
@@ -102,11 +103,11 @@ func (c *Cmd) Run(_ *kong.Context) error {
 
 	if c.Debug {
 		if c.Config.XPCLI.Tier == xpcli.TierV1 {
-			utils.DebugPrintf("Crossplane CLI v1 detected; patches.xrd will not be passed as --xrd to render\n")
+			debuglog.Printf("Crossplane CLI v1 detected; patches.xrd will not be passed as --xrd to render\n")
 		}
 
 		if c.CrossplaneVersion != "" && !c.Config.XPCLI.SupportsRenderVersion() {
-			utils.DebugPrintf("--crossplane-version is not supported by the legacy Crossplane CLI (< v2.3.0); skipping for render, but --crossplane-image will still be passed to validate\n")
+			debuglog.Printf("--crossplane-version is not supported by the legacy Crossplane CLI (< v2.3.0); skipping for render, but --crossplane-image will still be passed to validate\n")
 		}
 	}
 

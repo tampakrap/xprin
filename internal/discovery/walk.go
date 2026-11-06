@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/crossplane-contrib/xprin/internal/debuglog"
 	"github.com/crossplane-contrib/xprin/internal/utils"
 	"github.com/gertd/go-pluralize"
 	"github.com/spf13/afero"
@@ -92,7 +93,7 @@ func Walk(fs afero.Fs, targets []string, options Options, visit Visitor) error {
 		info, err := fs.Stat(path)
 		if errors.Is(err, iofs.ErrNotExist) {
 			if options.Debug {
-				utils.DebugPrintf("Skipping test path %s because it does not exist\n", path)
+				debuglog.Printf("Skipping test path %s because it does not exist\n", path)
 			}
 
 			continue
@@ -116,7 +117,7 @@ func Walk(fs afero.Fs, targets []string, options Options, visit Visitor) error {
 		// Direct file - check if it's a valid test file
 		if !isValidTestSuiteFileName(path) {
 			if options.Debug {
-				utils.DebugPrintf("Skipping file %s because it is not a valid test file. It should be named 'xprin.yaml' or end with '_xprin.yaml' with at least one character before the underscore\n", path)
+				debuglog.Printf("Skipping file %s because it is not a valid test file. It should be named 'xprin.yaml' or end with '_xprin.yaml' with at least one character before the underscore\n", path)
 			}
 
 			continue
@@ -138,7 +139,7 @@ func Walk(fs afero.Fs, targets []string, options Options, visit Visitor) error {
 // and calls visit for each of them.
 func walkDirectory(fs afero.Fs, dir string, options Options, visit Visitor) error {
 	if options.Debug {
-		utils.DebugPrintf("Processing directory %s\n", dir)
+		debuglog.Printf("Processing directory %s\n", dir)
 	}
 
 	files, err := findTestSuiteFiles(fs, dir)
@@ -159,7 +160,7 @@ func walkDirectory(fs afero.Fs, dir string, options Options, visit Visitor) erro
 	// 2. If we get here, we already know there's no error, so files must be non-empty
 	if options.Debug {
 		plural := pluralize.NewClient()
-		utils.DebugPrintf("Found %s in directory %s\n", plural.Pluralize("testsuite file", len(files), true), dir)
+		debuglog.Printf("Found %s in directory %s\n", plural.Pluralize("testsuite file", len(files), true), dir)
 	}
 
 	var hasErrors bool
