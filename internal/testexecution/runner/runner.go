@@ -27,6 +27,7 @@ import (
 	"strings"
 
 	"github.com/crossplane-contrib/xprin/internal/api"
+	"github.com/crossplane-contrib/xprin/internal/debuglog"
 	"github.com/crossplane-contrib/xprin/internal/engine"
 	testexecutionOptions "github.com/crossplane-contrib/xprin/internal/testexecution/options"
 	"github.com/crossplane-contrib/xprin/internal/testsuite"
@@ -46,9 +47,11 @@ type Runner struct {
 	fs        afero.Fs
 	testSuite *testsuite.TestSuite // the test suite that is run: its file, its spec and its dependency graph
 	output    io.Writer
-	debug     *debugLog // where the --debug lines go: stderr, or the buffer of the test case that this copy of the runner runs
-	mode      runnerMode
-	env       *testSuiteEnv
+	debug     *debuglog.Log // where the --debug lines go: stderr, or the buffer of the test case that this copy of the runner runs
+	// debugOutput is where the --debug lines that a result kept are printed.
+	debugOutput io.Writer
+	mode        runnerMode
+	env         *testSuiteEnv
 	// Mockable function fields
 	runTestCaseFunc                   func(api.TestCase) *engine.TestCaseResult
 	expandPathRelativeToTestSuiteFile func(base, path string) (string, error)
@@ -77,11 +80,12 @@ type testCaseEnv struct {
 // NewRunner creates a new test runner.
 func NewRunner(options *testexecutionOptions.Options, testSuite *testsuite.TestSuite) *Runner {
 	r := &Runner{
-		fs:        afero.NewOsFs(),
-		output:    os.Stdout, // Default output to stdout
-		debug:     &debugLog{w: os.Stderr},
-		Options:   options,
-		testSuite: testSuite,
+		fs:          afero.NewOsFs(),
+		output:      os.Stdout, // Default output to stdout
+		debug:       debuglog.New(os.Stderr),
+		debugOutput: os.Stderr,
+		Options:     options,
+		testSuite:   testSuite,
 		// Initialize mockable function fields with default implementations
 		runTestCaseFunc:                   nil, // will set default below
 		expandPathRelativeToTestSuiteFile: testsuite.ExpandPath,
@@ -139,19 +143,19 @@ func (r *Runner) SetupTestSuite() (err error) {
 	}()
 
 	if r.Debug {
-		r.debug.printf("Created internal artifacts directory: %s\n", savedOutputsDir)
+		r.debug.Printf("Created internal artifacts directory: %s\n", savedOutputsDir)
 	}
 
 	if r.Debug {
-		r.debug.printf("Using testsuite file directory for relative path resolution: %s\n", r.testSuite.GetDir())
+		r.debug.Printf("Using testsuite file directory for relative path resolution: %s\n", r.testSuite.GetDir())
 
 		// We do not expand or verify common fields here. They will be expanded and verified by the individual test cases that do not override them.
 		if r.testSuite.Spec.HasCommon() {
-			r.debugPrintCommon(r.testSuite.Spec.Common, "Found common configuration:")
+			r.debug.PrintCommon(r.testSuite.Spec.Common, "Found common configuration:")
 		}
 
 		plural := pluralize.NewClient()
-		r.debug.printf("Found %s\n", plural.Pluralize("test case", len(r.testSuite.Spec.Tests), true))
+		r.debug.Printf("Found %s\n", plural.Pluralize("test case", len(r.testSuite.Spec.Tests), true))
 	}
 
 	// Create test suite result
@@ -197,7 +201,7 @@ func (r *Runner) runTestCase(testCase api.TestCase, index int, testSuiteResult *
 	var log strings.Builder
 
 	own := *r
-	own.debug = &debugLog{w: &log}
+	own.debug = debuglog.New(&log)
 	own.mode = newRunnerMode(&own)
 
 	result := own.executeTestCase(testCase, index, testSuiteResult)
@@ -208,7 +212,7 @@ func (r *Runner) runTestCase(testCase api.TestCase, index int, testSuiteResult *
 
 func (r *Runner) executeTestCase(testCase api.TestCase, index int, testSuiteResult *engine.TestSuiteResult) *engine.TestCaseResult {
 	if r.Debug {
-		r.debug.printf("Starting test case '%s'\n", testCase.Name)
+		r.debug.Printf("Starting test case '%s'\n", testCase.Name)
 	}
 
 	result := engine.NewTestCaseResult(testCase.Name, testCase.ID, r.Verbose, r.ShowRender, r.ShowValidate, r.ShowHooks, r.ShowAssertions)
@@ -261,9 +265,9 @@ func (r *Runner) executeTestCase(testCase api.TestCase, index int, testSuiteResu
 	}
 
 	if r.Debug {
-		r.debug.printf("Created temporary directory for test case: %s\n", env.tmpDir)
-		r.debug.printf("- Inputs: %s\n", env.inputsDir)
-		r.debug.printf("- Outputs: %s\n", env.outputsDir)
+		r.debug.Printf("Created temporary directory for test case: %s\n", env.tmpDir)
+		r.debug.Printf("- Inputs: %s\n", env.inputsDir)
+		r.debug.Printf("- Outputs: %s\n", env.outputsDir)
 	}
 
 	if r.testSuite.Spec.HasCommon() {
@@ -280,7 +284,7 @@ func (r *Runner) executeTestCase(testCase api.TestCase, index int, testSuiteResu
 	}
 
 	if r.Debug {
-		r.debugPrintTestCase(testCase, "Test specification:")
+		r.debug.PrintTestCase(testCase, "Test specification:")
 	}
 
 	if failed := r.expandInputPaths(&testCase, result); failed != nil {
@@ -309,7 +313,7 @@ func (r *Runner) printTestCaseResult(positionInTestSuite int) {
 	result := r.env.testCaseResults[positionInTestSuite]
 
 	// The --debug lines of a test case that ran at the same time as others come with its result, not mixed with theirs
-	fmt.Fprint(r.debug.w, result.DebugLog) //nolint:errcheck // output function, error handling not practical
+	fmt.Fprint(r.debugOutput, result.DebugLog) //nolint:errcheck // output function, error handling not practical
 
 	result.Print(r.output)
 }
